@@ -26,6 +26,14 @@
 #include "DataFormats/ParticleFlowReco/interface/PFBlockFwd.h"
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidateFwd.h"
 
+#include "TFile.h"
+#include "TTree.h"
+#include "TClonesArray.h"
+#include "SimCalorimetry/HcalTrigPrimAlgos/interface/HcalTriggerPrimitiveAlgo.h"
+#include "DataFormats/HcalDigi/interface/HcalDigiCollections.h"
+#include "DataFormats/FEDRawData/interface/FEDRawDataCollection.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+
 class PFAlgo;
 class PFEnergyCalibrationHF;
 class GBRForest;
@@ -42,12 +50,21 @@ This producer makes use of PFAlgo, the particle flow algorithm.
 class PFProducer : public edm::stream::EDProducer<> {
  public:
   explicit PFProducer(const edm::ParameterSet&);
-  ~PFProducer() override;
-  
+  ~PFProducer() override {endJob();}
+
+  void endJob(); 
   void produce(edm::Event&, const edm::EventSetup&) override;
   void beginRun(const edm::Run &, const edm::EventSetup &) override;
 
  private:
+
+  TFile *fFile;
+  TTree *fTree;
+  TClonesArray *fPFParArr;
+  const HcalDDDRecConstants *fRecNumber;
+  const CaloGeometry* fGeometry;
+  //edm::EDGetTokenT<edm::PCaloHitContainer> fSHitToken;
+
   edm::EDGetTokenT<reco::PFBlockCollection>  inputTagBlocks_;
   edm::EDGetTokenT<reco::MuonCollection>     inputTagMuons_;
   edm::EDGetTokenT<reco::VertexCollection>   vertices_;

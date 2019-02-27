@@ -14,10 +14,17 @@
 <use   name="RecoParticleFlow/PFTracking"/>
 <use   name="RecoEcal/EgammaCoreTools"/>
 <use   name="RecoEgamma/ElectronIdentification"/>
+<use   name="Geometry/CaloGeometry"/>
+<use   name="SimCalorimetry/HcalTrigPrimAlgos"/>
+<use   name="SimCalorimetry/HcalSimAlgos"/>
+<use   name="SimCalorimetry/CaloSimAlgos"/>
+<use   name="FWCore/ParameterSet"/>
+<use   name="FWCore/Framework"/>
 <use   name="boost"/>
 <use   name="clhep"/>
 <use   name="rootmath"/>
 <use   name="roottmva"/>
+<use   name="CaloTrigNN/DataFormats"/>
 <export>
   <lib   name="1"/>
 </export>

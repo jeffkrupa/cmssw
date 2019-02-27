@@ -1,6 +1,7 @@
 #include "RecoParticleFlow/PFProducer/plugins/PFProducer.h"
 #include "RecoParticleFlow/PFProducer/interface/PFAlgo.h"
 
+#include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -10,6 +11,23 @@
 #include "CondFormats/PhysicsToolsObjects/interface/PerformancePayloadFromTFormula.h"
 #include "CondFormats/DataRecord/interface/PFCalibrationRcd.h"
 #include "CondFormats/DataRecord/interface/GBRWrapperRcd.h"
+
+#include "DataFormats/HcalDigi/interface/HcalTriggerPrimitiveDigi.h"
+#include "SimDataFormats/CaloHit/interface/PCaloHit.h"
+#include "SimDataFormats/CaloHit/interface/PCaloHitContainer.h"
+#include "Geometry/Records/interface/CaloGeometryRecord.h"
+#include "CalibFormats/HcalObjects/interface/HcalTPGRecord.h"
+#include "CalibFormats/HcalObjects/interface/HcalTPGCoder.h"
+#include "CalibFormats/CaloTPG/interface/HcalTPGCompressor.h"
+#include "CalibFormats/CaloTPG/interface/CaloTPGRecord.h"
+#include "CalibFormats/CaloTPG/interface/CaloTPGTranscoder.h"
+#include "CalibFormats/HcalObjects/interface/HcalDbService.h"
+#include "CalibFormats/HcalObjects/interface/HcalDbRecord.h"
+#include "CondFormats/HcalObjects/interface/HcalElectronicsMap.h"
+#include "CondFormats/HcalObjects/interface/HcalLutMetadata.h"
+#include "DataFormats/HcalDigi/interface/HBHEDataFrame.h"
+#include "DataFormats/HcalDigi/interface/HFDataFrame.h"
+#include "DataFormats/HcalDigi/interface/HcalTriggerPrimitiveDigi.h"
 
 #include <sstream>
 
@@ -41,6 +59,14 @@ PFProducer::PFProducer(const edm::ParameterSet& iConfig) {
   boost::shared_ptr<PFEnergyCalibrationHF>  
     thepfEnergyCalibrationHF ( new PFEnergyCalibrationHF(calibHF_use,calibHF_eta_step,calibHF_a_EMonly,calibHF_b_HADonly,calibHF_a_EMHAD,calibHF_b_EMHAD) ) ;
   //-----------------
+
+  //produces<HcalTrigPrimDigiCollection>();
+  fFile = new TFile("Output_NEW.root","RECREATE");
+  fPFParArr = new TClonesArray("baconhep::TPFPart",5000);
+  fTree = new TTree("Events","Events");
+  fTree->Branch("PFDepth" , &fPFParArr); 
+  //fSHitToken = consumes<PCaloHitContainer>(InputTag("g4SimHits","HcalHits"));
+
 
   inputTagBlocks_ = consumes<reco::PFBlockCollection>(iConfig.getParameter<InputTag>("blocks"));
   
@@ -403,7 +429,15 @@ PFProducer::PFProducer(const edm::ParameterSet& iConfig) {
 
 
 
-PFProducer::~PFProducer() {}
+//PFProducer::~PFProducer() {endJob(); delete fPFParArr;}
+
+void
+PFProducer::endJob() {
+  fFile->cd();
+  fTree->Write();
+  fFile->Write();
+  fFile->Close();
+}
 
 void 
 PFProducer::beginRun(const edm::Run & run, 
@@ -557,10 +591,31 @@ PFProducer::produce(Event& iEvent,
 
   LogDebug("PFProducer")<<"particle flow is starting"<<endl;
 
-  assert( blocks.isValid() );
 
-  pfAlgo_->reconstructParticles( blocks );
+  fPFParArr->Clear();
+  assert( blocks.isValid() );
+  edm::ESHandle<HcalDDDRecConstants> pHRNDC;
+  iSetup.get<HcalRecNumberingRecord>().get( pHRNDC );
+  fRecNumber= &*pHRNDC;
+  // Step A: get the conditions, for the decoding
+  edm::ESHandle<HcalTPGCoder> inputCoder;
+  iSetup.get<HcalTPGRecord>().get(inputCoder);
+  edm::ESHandle<HcalTrigTowerGeometry> pG;
+  iSetup.get<CaloGeometryRecord>().get(pG);
+  //Get the Gen Info
+  //Handle<PCaloHitContainer> hSimHits;      // create handle
+  //iEvent.getByToken(fSHitToken, hSimHits);   // SimHits
+
+  edm::ESHandle<CaloGeometry> geometry;
+  //iEvent.getByToken(fSHitToken, hSimHits);   // SimHits
+  iSetup.get<HcalRecNumberingRecord>().get( pHRNDC );
+  iSetup.get<CaloGeometryRecord>().get( geometry );
   
+  //edm::PCaloHitContainer lSimHits  = *hSimHits;
+  fGeometry = &*geometry;
+  fRecNumber= &*pHRNDC; 
+  pfAlgo_->reconstructParticlesNew( blocks , fPFParArr);// iEvent, iSetup, fRecNumber);
+  fTree->Fill();  
   if(verbose_) {
     ostringstream  str;
     str<<(*pfAlgo_)<<endl;
@@ -568,6 +623,7 @@ PFProducer::produce(Event& iEvent,
     LogInfo("PFProducer") <<str.str()<<endl;
   }  
 
+  pfAlgo_->reconstructParticles( blocks);
 
   // Florian 5/01/2011
   // Save the PFElectron Extra Collection First as to be able to create valid References  

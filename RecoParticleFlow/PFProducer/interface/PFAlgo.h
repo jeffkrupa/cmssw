@@ -7,6 +7,10 @@
 // #include "FWCore/Framework/interface/Handle.h"
 #include "CondFormats/EgammaObjects/interface/GBRForest.h"
 #include "DataFormats/Common/interface/Handle.h"
+
+#include "FWCore/Utilities/interface/InputTag.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/ESHandle.h"
 // #include "FWCore/Framework/interface/OrphanHandle.h"
 #include "DataFormats/Common/interface/OrphanHandle.h"
 
@@ -34,6 +38,14 @@
 #include "RecoParticleFlow/PFProducer/interface/PFMuonAlgo.h"
 #include "RecoParticleFlow/PFProducer/interface/PFEGammaFilters.h"
 #include "DataFormats/Common/interface/ValueMap.h"
+
+#include "SimDataFormats/CaloHit/interface/PCaloHit.h"
+#include "SimDataFormats/CaloHit/interface/PCaloHitContainer.h"
+#include "SimCalorimetry/CaloSimAlgos/interface/CaloHitResponse.h"
+#include "SimCalorimetry/HcalSimAlgos/interface/HcalSimParameterMap.h"
+#include "Geometry/HcalCommonData/interface/HcalDDDRecConstants.h"
+
+class TClonesArray;
 
 /// \brief Particle Flow Algorithm
 /*!
@@ -182,7 +194,11 @@ class PFAlgo {
 
   /// reconstruct particles 
   virtual void reconstructParticles( const reco::PFBlockCollection& blocks );
-  
+ 
+  void reconstructParticlesNew( const reco::PFBlockHandle& blockHandle, TClonesArray *array);//,const edm::Event &iEvent,const edm::EventSetup &iSetup, const HcalDDDRecConstants *iRecNumber); 
+
+  virtual void reconstructParticlesNew( const reco::PFBlockCollection& blockHandle, TClonesArray *array);//,const edm::Event &iEvent,const edm::EventSetup &iSetup, const HcalDDDRecConstants *iRecNumber);    
+
   /// Check HF Cleaning
   void checkCleaning( const reco::PFRecHitCollection& cleanedHF );
 
@@ -244,7 +260,10 @@ class PFAlgo {
   virtual void processBlock( const reco::PFBlockRef& blockref,
                              std::list<reco::PFBlockRef>& hcalBlockRefs, 
                              std::list<reco::PFBlockRef>& ecalBlockRefs ); 
-  
+  virtual void processBlockNew( const reco::PFBlockRef& blockref,
+                           std::list<reco::PFBlockRef>& hcalBlockRefs,
+                           std::list<reco::PFBlockRef>& ecalBlockRefs, 
+                           TClonesArray &rArray ); 
   /// Reconstruct a charged particle from a track
   /// Returns the index of the newly created candidate in pfCandidates_
   /// Michalis added a flag here to treat muons inside jets
@@ -263,7 +282,17 @@ class PFAlgo {
 			       double particleY=0.,
 			       double particleZ=0.);
 
+  unsigned reconstructClusterNew( const reco::PFCluster& cluster,
+                               double particleEnergy,
+                               TClonesArray &rArray,
+			       bool useDirection = false,
+                               double particleX=0.,
+                               double particleY=0.,
+                               double particleZ=0.);
+
   void setHcalDepthInfo(reco::PFCandidate & cand, const reco::PFCluster& cluster) const ;
+
+  void setHcalDepthInfoNew(reco::PFCandidate & cand, const reco::PFCluster& cluster, TClonesArray &rArray) const ;
 
   /// \return calibrated energy of a photon
   // double gammaCalibratedEnergy( double clusterEnergy ) const;
