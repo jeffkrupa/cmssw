@@ -6,6 +6,7 @@
 
 #include "RecoLocalCalo/HcalRecAlgos/interface/PulseShapeFitOOTPileupCorrection.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalDeterministicFit.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNFit.h"
 
 // Phase 1 HBHE reco algorithm headers
 #include "RecoLocalCalo/HcalRecAlgos/interface/SimpleHBHEPhase1Algo.h"
@@ -94,6 +95,15 @@ parseHBHEMethod3Description(const edm::ParameterSet& conf)
 }
 
 
+
+static std::unique_ptr<NNFit>
+parseHBHENNDescription(const edm::ParameterSet& conf)
+{
+    std::unique_ptr<NNFit> fit = std::make_unique<NNFit>();
+
+    return fit;
+}
+
 std::unique_ptr<AbsHBHEPhase1Algo>
 parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
 {
@@ -106,6 +116,7 @@ parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
 	std::unique_ptr<MahiFit> mahi;
 	std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2;
         std::unique_ptr<HcalDeterministicFit> detFit;
+        std::unique_ptr<NNFit> NN;
 
 	// only run Mahi OR Method 2 but not both
 	if (ps.getParameter<bool>("useMahi") && ps.getParameter<bool>("useM2")) {
@@ -118,6 +129,8 @@ parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
 	  m2 = parseHBHEMethod2Description(ps);
 	if (ps.getParameter<bool>("useM3"))
 	  detFit = parseHBHEMethod3Description(ps);
+	if (ps.getParameter<bool>("useNN"))
+	  NN = parseHBHENNDescription(ps);
 
         algo = std::unique_ptr<AbsHBHEPhase1Algo>(
             new SimpleHBHEPhase1Algo(ps.getParameter<int>   ("firstSampleShift"),
@@ -125,7 +138,7 @@ parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
                                      ps.getParameter<double>("correctionPhaseNS"),
                                      ps.getParameter<double>("tdcTimeShift"),
                                      ps.getParameter<bool>  ("correctForPhaseContainment"),
-                                     std::move(m2), std::move(detFit), std::move(mahi))
+                                     std::move(m2), std::move(detFit), std::move(mahi), std::move(NN))
             );
     }
 

@@ -12,6 +12,8 @@
 #include "CondFormats/DataRecord/interface/HcalTimeSlewRecord.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/ESHandle.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNInference.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNFit.h"
 
 // Maximum fractional error for calculating Method 0
 // pulse containment correction
@@ -25,7 +27,8 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
     const bool correctForPhaseContainment,
     std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2,
     std::unique_ptr<HcalDeterministicFit> detFit,
-    std::unique_ptr<MahiFit> mahi)
+    std::unique_ptr<MahiFit> mahi,
+    std::unique_ptr<NNFit> NN)
     : pulseCorr_(PulseContainmentFractionalError),
       firstSampleShift_(firstSampleShift),
       samplesToAdd_(samplesToAdd),
@@ -35,8 +38,15 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
       corrFPC_(correctForPhaseContainment),
       psFitOOTpuCorr_(std::move(m2)),
       hltOOTpuCorr_(std::move(detFit)),
-      mahiOOTpuCorr_(std::move(mahi))
+      mahiOOTpuCorr_(std::move(mahi)),
+      NNOOTpuCorr_(std::move(NN))
 {
+
+  std::string cmssw_base_src = getenv("CMSSW_BASE");
+  std::string NNFile = cmssw_base_src + "/src/RecoLocalCalo/HcalRecAlgos/tf.pb";
+  NNInference* fNN = new NNInference();
+  fNN->initialize(NNFile);
+
   hcalTimeSlew_delay_ = nullptr;
 }
 
@@ -117,6 +127,15 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
       m4E *= hbminusCorrectionFactor(channelId, m4E, isData);
     }
 
+    // Run NN
+    float NNE = 0.f;
+    float NNT = 0.f;
+    const NNFit* NN = NNOOTpuCorr_.get();
+    if (NN)
+    {
+        NN->phase1Apply(info, NNE, fNN, channelId);
+    }
+
     // Finally, construct the rechit
     float rhE = m0E;
     float rht = m0t;
@@ -145,7 +164,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     rh.setRawEnergy(m0E);
     rh.setAuxEnergy(m3E);
     rh.setChiSquared(rhX);
-
+    rh.setNNEnergy(NNE);
     // Set rechit aux words
     HBHERecHitAuxSetter::setAux(info, &rh);
 

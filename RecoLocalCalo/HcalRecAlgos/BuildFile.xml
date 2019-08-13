@@ -1,6 +1,7 @@
 <use   name="boost"/>
 <use   name="eigen"/>
 <use   name="clhep"/>
+<use name="PhysicsTools/TensorFlow"/>
 <use   name="DataFormats/HcalDigi"/>
 <use   name="DataFormats/HcalRecHit"/>
 <use   name="CalibFormats/HcalObjects"/>

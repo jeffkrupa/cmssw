@@ -20,6 +20,7 @@ public:
       chiSquared_(-1),
       rawEnergy_(-1.0e21),
       auxEnergy_(-1.0e21),
+      NNEnergy_(-1.0e21),
       auxHBHE_(0),
       auxPhase1_(0)
   {}
@@ -31,6 +32,7 @@ public:
       chiSquared_(-1),
       rawEnergy_(-1.0e21),
       auxEnergy_(-1.0e21),
+      NNEnergy_(-1.0e21),
       auxHBHE_(0),
       auxPhase1_(0)
   {}
@@ -46,6 +48,9 @@ public:
 
   constexpr inline void setRawEnergy(const float en) {rawEnergy_ = en;}
   constexpr inline float eraw() const {return rawEnergy_;}
+
+  constexpr inline void setNNEnergy(const float en) {NNEnergy_ = en;}
+  constexpr inline float NNe() const {return NNEnergy_;}
 
   constexpr inline void setAuxEnergy(const float en) {auxEnergy_ = en;}
   constexpr inline float eaux() const {return auxEnergy_;}
@@ -71,6 +76,7 @@ private:
   float chiSquared_;
   float rawEnergy_;
   float auxEnergy_;
+  float NNEnergy_;
   uint32_t auxHBHE_;
   uint32_t auxPhase1_;
 };

@@ -13,6 +13,8 @@
 #include "RecoLocalCalo/HcalRecAlgos/interface/PulseShapeFitOOTPileupCorrection.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalDeterministicFit.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/MahiFit.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNInference.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNFit.h"
 #include "CalibCalorimetry/HcalAlgos/interface/HcalTimeSlew.h"
 
 class SimpleHBHEPhase1Algo : public AbsHBHEPhase1Algo
@@ -47,7 +49,8 @@ public:
                          bool correctForPhaseContainment,
                          std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2,
                          std::unique_ptr<HcalDeterministicFit> detFit,
-			 std::unique_ptr<MahiFit> mahi);
+			 std::unique_ptr<MahiFit> mahi,
+			 std::unique_ptr<NNFit> NN);
 
     inline ~SimpleHBHEPhase1Algo() override {}
 
@@ -60,7 +63,7 @@ public:
     HBHERecHit reconstruct(const HBHEChannelInfo& info,
                                    const HcalRecoParam* params,
                                    const HcalCalibrations& calibs,
-                                   bool isRealData) override;
+                                   bool isRealData);
     // Basic accessors
     inline int getFirstSampleShift() const {return firstSampleShift_;}
     inline int getSamplesToAdd() const {return samplesToAdd_;}
@@ -108,6 +111,9 @@ private:
     // Mahi algorithm
     std::unique_ptr<MahiFit> mahiOOTpuCorr_;
 
+    // NN algorithm
+    std::unique_ptr<NNFit> NNOOTpuCorr_;
+    NNInference* fNN;
     HcalPulseShapes theHcalPulseShapes_;
 };
 

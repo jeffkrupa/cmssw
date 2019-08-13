@@ -376,6 +376,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       reco_(parseHBHEPhase1AlgoDescription(conf.getParameter<edm::ParameterSet>("algorithm"))),
       negEFilter_(nullptr)
 {
+
     // Check that the reco algorithm has been successfully configured
     if (!reco_.get())
         throw cms::Exception("HBHEPhase1BadConfig")
@@ -756,6 +757,7 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
     desc.add<edm::InputTag>("digiLabelQIE8");
     desc.add<edm::InputTag>("digiLabelQIE11");
     desc.add<std::string>("algoConfigClass");
+    desc.add<std::string>("tfFile");
     desc.add<bool>("processQIE8");
     desc.add<bool>("processQIE11");
     desc.add<bool>("saveInfos");
