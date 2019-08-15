@@ -445,15 +445,20 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     // If "saveDroppedInfos_" flag is set, fill the info with something
     // meaningful even if the database tells us to drop this channel.
     // Note that this flag affects only "infos", the rechits are still
-    // not going to be constructed from such channels.
+    // not going to be constructed from such channel.
     const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
 
     // Iterate over the input collection
+    int dummy_it = 0;
+
+    std::cout << "coll length: " << coll.size() << std::endl;
     for (typename Collection::const_iterator it = coll.begin();
          it != coll.end(); ++it)
     {
+        std::cout << dummy_it << std::endl;
         const DFrame& frame(*it);
         const HcalDetId cell(frame.id());
+        ++dummy_it;
 
         // Protection against calibration channels which are not
         // in the database but can still come in the QIE11DataFrame

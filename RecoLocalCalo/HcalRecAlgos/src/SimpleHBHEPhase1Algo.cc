@@ -26,7 +26,8 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
     const bool applyLegacyHBMCorrection,
     std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2,
     std::unique_ptr<HcalDeterministicFit> detFit,
-    std::unique_ptr<MahiFit> mahi)
+    std::unique_ptr<MahiFit> mahi,
+    std::unique_ptr<NNFit> NN)
     : pulseCorr_(PulseContainmentFractionalError),
       firstSampleShift_(firstSampleShift),
       samplesToAdd_(samplesToAdd),
@@ -37,8 +38,15 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
       applyLegacyHBMCorrection_(applyLegacyHBMCorrection),
       psFitOOTpuCorr_(std::move(m2)),
       hltOOTpuCorr_(std::move(detFit)),
-      mahiOOTpuCorr_(std::move(mahi))
+      mahiOOTpuCorr_(std::move(mahi)),
+      NNOOTpuCorr_(std::move(NN))
+
 {
+  std::string cmssw_base_src = getenv("CMSSW_BASE");
+  std::string NNFile = "RecoLocalCalo/HcalRecProducers/data/graph_kin_ped_raw.pb";//"RecoLocalCalo/HcalRecProducers/data/graph.pb";
+  fNN = new NNInference();
+  fNN->initialize(NNFile);
+
   hcalTimeSlew_delay_ = nullptr;
 }
 
@@ -65,7 +73,9 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
 {
     HBHERecHit rh;
 
+    std::cout << "before channelId" << std::endl;
     const HcalDetId channelId(info.id());
+    std::cout << "after channelId" << std::endl;
 
     // Calculate "Method 0" quantities
     float m0t = 0.f, m0E = 0.f;
@@ -119,6 +129,16 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
       m4E *= hbminusCorrectionFactor(channelId, m4E, isData);
     }
 
+    // Run NN
+    float NNE = 0.f;
+    float NNT = 0.f;
+    const NNFit* NN = NNOOTpuCorr_.get();
+
+    std::cout << "beforeNN" << std::endl;
+    if (NN)
+        NN->phase1Apply(info, NNE, &*fNN, channelId);
+    std::cout << "afterNN" << std::endl;
+
     // Finally, construct the rechit
     float rhE = m0E;
     float rht = m0t;
@@ -147,6 +167,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     rh.setRawEnergy(m0E);
     rh.setAuxEnergy(m3E);
     rh.setChiSquared(rhX);
+    rh.setNNEnergy(NNE);
 
     // Set rechit aux words
     HBHERecHitAuxSetter::setAux(info, &rh);
