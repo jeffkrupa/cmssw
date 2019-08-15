@@ -3,6 +3,6 @@ import FWCore.ParameterSet.Config as cms
 # Configuration parameters for Mahi
 NNParameters = cms.PSet(
 
-    tfFile         = cms.string("RecoLocalCalo/HcalRecAlgos/data/tf.pb")
+    tfFile         = cms.untracked.string("RecoLocalCalo/HcalRecProducers/data/graph.pb")
 
 )

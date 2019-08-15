@@ -94,6 +94,7 @@ protected:
                  int nSamplesToExamine) const;
 private:
     HcalPulseContainmentManager pulseCorr_;
+    NNInference* fNN;
 
     int firstSampleShift_;
     int samplesToAdd_;
@@ -113,7 +114,6 @@ private:
 
     // NN algorithm
     std::unique_ptr<NNFit> NNOOTpuCorr_;
-    NNInference* fNN;
     HcalPulseShapes theHcalPulseShapes_;
 };
 

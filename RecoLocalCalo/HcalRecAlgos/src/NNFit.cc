@@ -1,4 +1,5 @@
 #include "RecoLocalCalo/HcalRecAlgos/interface/NNFit.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNInference.h"
 
 NNFit::NNFit(){
 }
@@ -31,7 +32,6 @@ void NNFit::phase1Apply(const HBHEChannelInfo& channelData,
     inputPedestal.push_back(ped);
     //inputNoise.push_back(noise);
   } 
-
   fNN->fIeta = ieta;
   fNN->fIphi = iphi; 
   fNN->fDepth = depth;
@@ -56,6 +56,6 @@ void NNFit::phase1Apply(const HBHEChannelInfo& channelData,
   fNN->fPed7 = inputPedestal[7];
 
   fNN->SetNNVectorVar();
-
   reconstructedEnergy = fNN->EvaluateNN();
+
 }

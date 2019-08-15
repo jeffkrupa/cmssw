@@ -43,8 +43,8 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
 {
 
   std::string cmssw_base_src = getenv("CMSSW_BASE");
-  std::string NNFile = cmssw_base_src + "/src/RecoLocalCalo/HcalRecAlgos/tf.pb";
-  NNInference* fNN = new NNInference();
+  std::string NNFile = "RecoLocalCalo/HcalRecProducers/data/graph_kin_ped_raw.pb";//"RecoLocalCalo/HcalRecProducers/data/graph.pb";
+  fNN = new NNInference();
   fNN->initialize(NNFile);
 
   hcalTimeSlew_delay_ = nullptr;
@@ -73,8 +73,9 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
 {
     HBHERecHit rh;
 
+    std::cout << "before" << std::endl;
     const HcalDetId channelId(info.id());
-
+    std::cout << "after" << std::endl;
     // Calculate "Method 0" quantities
     float m0t = 0.f, m0E = 0.f;
     {
@@ -130,12 +131,14 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     // Run NN
     float NNE = 0.f;
     float NNT = 0.f;
-    const NNFit* NN = NNOOTpuCorr_.get();
-    if (NN)
-    {
-        NN->phase1Apply(info, NNE, fNN, channelId);
-    }
+    //const NNFit* NN = NNOOTpuCorr_.get();
 
+    //if (NN)
+    //{
+    //    NN->phase1Apply(info, NNE, &*fNN, channelId);
+    //`}
+
+    std::cout <<"NN/mahi: " << NNE << "/" << m4E << std::endl;
     // Finally, construct the rechit
     float rhE = m0E;
     float rht = m0t;

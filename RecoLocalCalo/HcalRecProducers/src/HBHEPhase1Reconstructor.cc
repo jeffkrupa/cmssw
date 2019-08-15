@@ -609,7 +609,6 @@ void
 HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetup)
 {
     using namespace edm;
-
     // Get the Hcal topology
     ESHandle<HcalTopology> htopo;
     eventSetup.get<HcalRecNumberingRecord>().get(htopo);
@@ -757,7 +756,7 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
     desc.add<edm::InputTag>("digiLabelQIE8");
     desc.add<edm::InputTag>("digiLabelQIE11");
     desc.add<std::string>("algoConfigClass");
-    desc.add<std::string>("tfFile");
+    //desc.add<std::string>("tfFile");
     desc.add<bool>("processQIE8");
     desc.add<bool>("processQIE11");
     desc.add<bool>("saveInfos");

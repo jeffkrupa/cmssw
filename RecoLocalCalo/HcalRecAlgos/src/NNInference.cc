@@ -25,6 +25,7 @@ void NNInference::SetNNVectorVar(){
 
     NNvectorVar_.clear();
 
+
     NNvectorVar_.push_back(fIeta) ;
     NNvectorVar_.push_back(fIphi) ;
     NNvectorVar_.push_back(fDepth) ;
@@ -49,12 +50,13 @@ void NNInference::SetNNVectorVar(){
 }
 
 float NNInference::EvaluateNN(){
+
     tensorflow::Tensor input(tensorflow::DT_FLOAT, {1,(unsigned int)NNvectorVar_.size()});
     for (unsigned int i = 0; i < NNvectorVar_.size(); i++){
         input.matrix<float>()(0,i) =  float(NNvectorVar_[i]);
     }
     std::vector<tensorflow::Tensor> outputs;
-    tensorflow::run(session, { { "input",input } }, { "output" }, &outputs);
+    tensorflow::run(session, { { "input",input } }, { "output/BiasAdd" }, &outputs);
     float inference = outputs[0].matrix<float>()(0, 0);
     return inference;
 
