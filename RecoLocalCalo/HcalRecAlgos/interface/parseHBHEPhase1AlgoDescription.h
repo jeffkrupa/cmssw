@@ -4,6 +4,7 @@
 #include <memory>
 #include "RecoLocalCalo/HcalRecAlgos/interface/AbsHBHEPhase1Algo.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/NNInference.h"
 
 namespace edm {
     class ParameterSet;
@@ -25,5 +26,5 @@ parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps);
 // "parseHBHEPhase1AlgoDescription".
 //
 edm::ParameterSetDescription fillDescriptionForParseHBHEPhase1Algo();
-
+//NNInference* fNN;
 #endif // RecoLocalCalo_HcalRecAlgos_parseHBHEPhase1AlgoDescription_h
