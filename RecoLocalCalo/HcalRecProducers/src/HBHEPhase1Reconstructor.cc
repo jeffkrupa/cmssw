@@ -341,6 +341,7 @@ private:
                      const bool use8ts);
 
     // Methods for setting rechit status bits
+
     void setAsicSpecificBits(const HBHEDataFrame& frame, const HcalCoder& coder,
                              const HBHEChannelInfo& info, const HcalCalibrations& calib,
                              HBHERecHit* rh);
@@ -445,16 +446,21 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     // If "saveDroppedInfos_" flag is set, fill the info with something
     // meaningful even if the database tells us to drop this channel.
     // Note that this flag affects only "infos", the rechits are still
-    // not going to be constructed from such channels.
+    // not going to be constructed from such channel.
     const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
 
-    std::vector<float> NNvec; 
+    std::vector<float>* NNvec; 
     // Iterate over the input collection
+    int dummy_it = 0;
+
+    std::cout << "coll length: " << coll.size() << std::endl;
     for (typename Collection::const_iterator it = coll.begin();
          it != coll.end(); ++it)
     {
+        std::cout << dummy_it << std::endl;
         const DFrame& frame(*it);
         const HcalDetId cell(frame.id());
+        ++dummy_it;
 
         // Protection against calibration channels which are not
         // in the database but can still come in the QIE11DataFrame
@@ -557,32 +563,11 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             if (recoParamsFromDB_)
                 pptr = param_ts;
 
-            std::vector<float> NNvec = setNNvector(*channelInfo);
-
-
- 
-            HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
-            if (rh.id().rawId())
-            {
-                setAsicSpecificBits(frame, coder, *channelInfo, calib, &rh);
-                setCommonStatusBits(*channelInfo, calib, &rh);
-                rechits->push_back(rh);
-            }
-        }
-    }
-}
-
-void HBHEPhase1Reconstructor::setCommonStatusBits(
-    const HBHEChannelInfo& /* info */, const HcalCalibrations& /* calib */,
-    HBHERecHit* /* rh */)
-{
-}
-
-std::vector<float> HBHEPhase1Reconstructor::setNNVector(const HBHEChannelInfo& channelInfo){ 
-            float ieta = (float)channelInfo.cell.ieta();
-            float iphi = (float)channelInfo.cell.iphi();
-            float depth = (float)channelInfo.cell.depth();
-            float gainCorr = (float)channelData.tsGain(1);
+  
+            float ieta = (float)cell.ieta();
+            float iphi = (float)cell.iphi();
+            float depth = (float)cell.depth();
+            float gainCorr = (float)channelInfo.tsGain(1);
             float raw0 = (float)channelInfo.tsRawCharge(0);
             float raw1 = (float)channelInfo.tsRawCharge(1);
             float raw2 = (float)channelInfo.tsRawCharge(2);
@@ -599,8 +584,6 @@ std::vector<float> HBHEPhase1Reconstructor::setNNVector(const HBHEChannelInfo& c
             float ped5 = (float)channelInfo.tsPedestal(5);
             float ped6 = (float)channelInfo.tsPedestal(6);
             float ped7 = (float)channelInfo.tsPedestal(7);
-
-            std::NNvec<float>;
 
             NNvec.push_back(ieta);
             NNvec.push_back(iphi);
@@ -623,8 +606,24 @@ std::vector<float> HBHEPhase1Reconstructor::setNNVector(const HBHEChannelInfo& c
     	    NNvec.push_back(ped6);
     	    NNvec.push_back(ped7);
 
-            return NNvec; 
+ 
+            HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
+            if (rh.id().rawId())
+            {
+                setAsicSpecificBits(frame, coder, *channelInfo, calib, &rh);
+                setCommonStatusBits(*channelInfo, calib, &rh);
+                rechits->push_back(rh);
+            }
+        }
+    }
 }
+
+void HBHEPhase1Reconstructor::setCommonStatusBits(
+    const HBHEChannelInfo& /* info */, const HcalCalibrations& /* calib */,
+    HBHERecHit* /* rh */)
+{
+}
+
 
 void HBHEPhase1Reconstructor::setAsicSpecificBits(
     const HBHEDataFrame& frame, const HcalCoder& coder,

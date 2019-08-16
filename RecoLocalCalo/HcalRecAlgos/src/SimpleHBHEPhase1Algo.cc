@@ -77,7 +77,9 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
 {
     HBHERecHit rh;
 
+    std::cout << "before channelId" << std::endl;
     const HcalDetId channelId(info.id());
+    std::cout << "after channelId" << std::endl;
 
     // Calculate "Method 0" quantities
     float m0t = 0.f, m0E = 0.f;
@@ -136,11 +138,9 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     float NNT = 0.f;
     const NNFit* NN = NNOOTpuCorr_.get();
 
-    //std::cout << "beforeNN" << std::endl;
     if (NN)
         NN->phase1Apply(info, NNE, &*fNN, channelId);
-    //std::cout << "afterNN" << std::endl;
-    //std::cout << "NN/mahi:" << NNE << "/" << m4E << std::endl;
+
     // Finally, construct the rechit
     float rhE = m0E;
     float rht = m0t;
@@ -170,7 +170,6 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     rh.setRawEnergy(m0E);
     rh.setAuxEnergy(m3E);
     rh.setChiSquared(rhX);
-    //rh.setNNEnergy(NNE);
 
     // Set rechit aux words
     HBHERecHitAuxSetter::setAux(info, &rh);

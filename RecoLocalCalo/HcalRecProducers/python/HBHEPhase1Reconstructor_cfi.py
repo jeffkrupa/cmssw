@@ -77,7 +77,7 @@ hbheprereco = cms.EDProducer(
         useM3 = cms.bool(True),
 
         # Use Mahi?
-        useMahi = cms.bool(False),
+        useMahi = cms.bool(True),
         useNN = cms.bool(True),
         # Apply legacy HB- energy correction?
         applyLegacyHBMCorrection = cms.bool(True)
