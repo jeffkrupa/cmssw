@@ -448,6 +448,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     // not going to be constructed from such channels.
     const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
 
+    std::vector<float> NNvec; 
     // Iterate over the input collection
     for (typename Collection::const_iterator it = coll.begin();
          it != coll.end(); ++it)
@@ -555,6 +556,11 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             const HcalRecoParam* pptr = nullptr;
             if (recoParamsFromDB_)
                 pptr = param_ts;
+
+            std::vector<float> NNvec = setNNvector(*channelInfo);
+
+
+ 
             HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
             if (rh.id().rawId())
             {
@@ -570,6 +576,54 @@ void HBHEPhase1Reconstructor::setCommonStatusBits(
     const HBHEChannelInfo& /* info */, const HcalCalibrations& /* calib */,
     HBHERecHit* /* rh */)
 {
+}
+
+std::vector<float> HBHEPhase1Reconstructor::setNNVector(const HBHEChannelInfo& channelInfo){ 
+            float ieta = (float)channelInfo.cell.ieta();
+            float iphi = (float)channelInfo.cell.iphi();
+            float depth = (float)channelInfo.cell.depth();
+            float gainCorr = (float)channelData.tsGain(1);
+            float raw0 = (float)channelInfo.tsRawCharge(0);
+            float raw1 = (float)channelInfo.tsRawCharge(1);
+            float raw2 = (float)channelInfo.tsRawCharge(2);
+            float raw3 = (float)channelInfo.tsRawCharge(3);
+            float raw4 = (float)channelInfo.tsRawCharge(4);
+            float raw5 = (float)channelInfo.tsRawCharge(5);
+            float raw6 = (float)channelInfo.tsRawCharge(6);
+            float raw7 = (float)channelInfo.tsRawCharge(7);
+            float ped0 = (float)channelInfo.tsPedestal(0);
+            float ped1 = (float)channelInfo.tsPedestal(1);
+            float ped2 = (float)channelInfo.tsPedestal(2);
+            float ped3 = (float)channelInfo.tsPedestal(3);
+            float ped4 = (float)channelInfo.tsPedestal(4);
+            float ped5 = (float)channelInfo.tsPedestal(5);
+            float ped6 = (float)channelInfo.tsPedestal(6);
+            float ped7 = (float)channelInfo.tsPedestal(7);
+
+            std::NNvec<float>;
+
+            NNvec.push_back(ieta);
+            NNvec.push_back(iphi);
+            NNvec.push_back(depth);
+            NNvec.push_back(gainCorr);
+    	    NNvec.push_back(raw0);
+    	    NNvec.push_back(raw1);
+    	    NNvec.push_back(raw2);
+    	    NNvec.push_back(raw3);
+    	    NNvec.push_back(raw4);
+    	    NNvec.push_back(raw5);
+    	    NNvec.push_back(raw6);
+    	    NNvec.push_back(raw7);
+    	    NNvec.push_back(ped0);
+    	    NNvec.push_back(ped1);
+    	    NNvec.push_back(ped2);
+    	    NNvec.push_back(ped3);
+    	    NNvec.push_back(ped4);
+    	    NNvec.push_back(ped5);
+    	    NNvec.push_back(ped6);
+    	    NNvec.push_back(ped7);
+
+            return NNvec; 
 }
 
 void HBHEPhase1Reconstructor::setAsicSpecificBits(
