@@ -21,6 +21,7 @@
 #include <cmath>
 #include <utility>
 #include <algorithm>
+#include <chrono>
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -37,6 +38,8 @@
 #include "DataFormats/HcalDigi/interface/HcalDigiCollections.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "DataFormats/METReco/interface/HcalPhase1FlagLabels.h"
+
+#include "DataFormats/CaloRecHit/interface/CaloRecHit.h"
 
 #include "CalibFormats/HcalObjects/interface/HcalDbService.h"
 #include "CalibFormats/HcalObjects/interface/HcalDbRecord.h"
@@ -59,7 +62,7 @@
 
 // Fetcher for reco algorithm data
 #include "RecoLocalCalo/HcalRecAlgos/interface/fetchHcalAlgoData.h"
-
+#include "PhysicsTools/TensorFlow/interface/TensorFlow.h"
 // Some helper functions
 namespace {
     // Class for making SiPM/QIE11 look like HPD/QIE8. HPD/QIE8
@@ -304,6 +307,7 @@ private:
     bool use8ts_;
     int sipmQTSShift_;
     int sipmQNTStoSum_;
+    bool runNN_;
 
     // Parameters for turning status bit setters on/off
     bool setNegativeFlagsQIE8_;
@@ -338,6 +342,7 @@ private:
                      HBHEChannelInfo* info,
                      HBHEChannelInfoCollection* infoColl,
                      HBHERecHitCollection* rechits,
+                     HBHERecHitCollection* rechits_tmp,
                      const bool use8ts);
 
     // Methods for setting rechit status bits
@@ -371,6 +376,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       use8ts_(conf.getParameter<bool>("use8ts")),
       sipmQTSShift_(conf.getParameter<int>("sipmQTSShift")),
       sipmQNTStoSum_(conf.getParameter<int>("sipmQNTStoSum")),
+      runNN_(conf.getParameter<bool>("runNN")),
       setNegativeFlagsQIE8_(conf.getParameter<bool>("setNegativeFlagsQIE8")),
       setNegativeFlagsQIE11_(conf.getParameter<bool>("setNegativeFlagsQIE11")),
       setNoiseFlagsQIE8_(conf.getParameter<bool>("setNoiseFlagsQIE8")),
@@ -441,6 +447,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                           HBHEChannelInfo* channelInfo,
                                           HBHEChannelInfoCollection* infos,
                                           HBHERecHitCollection* rechits,
+                                          HBHERecHitCollection* rechits_tmp,
                                           const bool use8ts_)
 {
     // If "saveDroppedInfos_" flag is set, fill the info with something
@@ -449,18 +456,20 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     // not going to be constructed from such channel.
     const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
 
-    std::vector<float>* NNvec; 
-    // Iterate over the input collection
-    int dummy_it = 0;
+    unsigned int nRH = 0;
+    std::vector<std::vector<float>> rhArr;
+    std::vector<float> NNvec; 
+    unsigned int NNit = 0;
 
-    std::cout << "coll length: " << coll.size() << std::endl;
+    // Iterate over the input collection
     for (typename Collection::const_iterator it = coll.begin();
          it != coll.end(); ++it)
     {
-        std::cout << dummy_it << std::endl;
+
+      
         const DFrame& frame(*it);
         const HcalDetId cell(frame.id());
-        ++dummy_it;
+
 
         // Protection against calibration channels which are not
         // in the database but can still come in the QIE11DataFrame
@@ -562,60 +571,118 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             const HcalRecoParam* pptr = nullptr;
             if (recoParamsFromDB_)
                 pptr = param_ts;
-
-  
-            float ieta = (float)cell.ieta();
-            float iphi = (float)cell.iphi();
-            float depth = (float)cell.depth();
-            float gainCorr = (float)channelInfo.tsGain(1);
-            float raw0 = (float)channelInfo.tsRawCharge(0);
-            float raw1 = (float)channelInfo.tsRawCharge(1);
-            float raw2 = (float)channelInfo.tsRawCharge(2);
-            float raw3 = (float)channelInfo.tsRawCharge(3);
-            float raw4 = (float)channelInfo.tsRawCharge(4);
-            float raw5 = (float)channelInfo.tsRawCharge(5);
-            float raw6 = (float)channelInfo.tsRawCharge(6);
-            float raw7 = (float)channelInfo.tsRawCharge(7);
-            float ped0 = (float)channelInfo.tsPedestal(0);
-            float ped1 = (float)channelInfo.tsPedestal(1);
-            float ped2 = (float)channelInfo.tsPedestal(2);
-            float ped3 = (float)channelInfo.tsPedestal(3);
-            float ped4 = (float)channelInfo.tsPedestal(4);
-            float ped5 = (float)channelInfo.tsPedestal(5);
-            float ped6 = (float)channelInfo.tsPedestal(6);
-            float ped7 = (float)channelInfo.tsPedestal(7);
-
-            NNvec.push_back(ieta);
-            NNvec.push_back(iphi);
-            NNvec.push_back(depth);
-            NNvec.push_back(gainCorr);
-    	    NNvec.push_back(raw0);
-    	    NNvec.push_back(raw1);
-    	    NNvec.push_back(raw2);
-    	    NNvec.push_back(raw3);
-    	    NNvec.push_back(raw4);
-    	    NNvec.push_back(raw5);
-    	    NNvec.push_back(raw6);
-    	    NNvec.push_back(raw7);
-    	    NNvec.push_back(ped0);
-    	    NNvec.push_back(ped1);
-    	    NNvec.push_back(ped2);
-    	    NNvec.push_back(ped3);
-    	    NNvec.push_back(ped4);
-    	    NNvec.push_back(ped5);
-    	    NNvec.push_back(ped6);
-    	    NNvec.push_back(ped7);
-
  
             HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
             if (rh.id().rawId())
             {
+                nRH++; 
+ 		NNvec.clear(); 
+                if(runNN_)
+		  {
+                    float ieta = (float)cell.ieta();
+                    float iphi = (float)cell.iphi();
+                    float depth = (float)cell.depth();
+                    float gainCorr = (float)channelInfo->tsGain(1);
+                    float raw0 = (float)channelInfo->tsRawCharge(0);
+                    float raw1 = (float)channelInfo->tsRawCharge(1);
+                    float raw2 = (float)channelInfo->tsRawCharge(2);
+                    float raw3 = (float)channelInfo->tsRawCharge(3);
+                    float raw4 = (float)channelInfo->tsRawCharge(4);
+                    float raw5 = (float)channelInfo->tsRawCharge(5);
+                    float raw6 = (float)channelInfo->tsRawCharge(6);
+                    float raw7 = (float)channelInfo->tsRawCharge(7);
+                    float ped0 = (float)channelInfo->tsPedestal(0);
+                    float ped1 = (float)channelInfo->tsPedestal(1);
+                    float ped2 = (float)channelInfo->tsPedestal(2);
+                    float ped3 = (float)channelInfo->tsPedestal(3);
+                    float ped4 = (float)channelInfo->tsPedestal(4);
+                    float ped5 = (float)channelInfo->tsPedestal(5);
+                    float ped6 = (float)channelInfo->tsPedestal(6);
+                    float ped7 = (float)channelInfo->tsPedestal(7);
+        
+                    NNvec.push_back(ieta);
+                    NNvec.push_back(iphi);
+                    NNvec.push_back(depth);
+                    NNvec.push_back(gainCorr);
+            	    NNvec.push_back(raw0);
+            	    NNvec.push_back(raw0);
+            	    NNvec.push_back(raw1);
+            	    NNvec.push_back(raw2);
+            	    NNvec.push_back(raw3);
+            	    NNvec.push_back(raw4);
+            	    NNvec.push_back(raw5);
+            	    NNvec.push_back(raw6);
+            	    NNvec.push_back(raw7);
+            	    NNvec.push_back(ped0);
+            	    NNvec.push_back(ped1);
+            	    NNvec.push_back(ped2);
+            	    NNvec.push_back(ped3);
+            	    NNvec.push_back(ped4);
+            	    NNvec.push_back(ped5);
+            	    NNvec.push_back(ped6);
+            	    NNvec.push_back(ped7);
+            	    NNvec.push_back(raw1);
+            	    NNvec.push_back(raw2);
+            	    NNvec.push_back(raw3);
+            	    NNvec.push_back(raw4);
+            	    NNvec.push_back(raw5);
+            	    NNvec.push_back(raw6);
+            	    NNvec.push_back(raw7);
+            	    NNvec.push_back(ped0);
+            	    NNvec.push_back(ped1);
+            	    NNvec.push_back(ped2);
+            	    NNvec.push_back(ped3);
+            	    NNvec.push_back(ped4);
+            	    NNvec.push_back(ped5);
+            	    NNvec.push_back(ped6);
+            	    NNvec.push_back(ped7);
+	         }
+
+                rhArr.push_back(NNvec);
                 setAsicSpecificBits(frame, coder, *channelInfo, calib, &rh);
                 setCommonStatusBits(*channelInfo, calib, &rh);
-                rechits->push_back(rh);
+	  	std::cout << "Before RecHit" << std::endl;	
+	        rechits_tmp->push_back(rh);
+		std::cout << "After RecHit" << std::endl;
             }
         }
+
     }
+    if(runNN_){
+       std::string cmssw_base_src = getenv("CMSSW_BASE");
+       std::string graph = cmssw_base_src + "/src/RecoLocalCalo/HcalRecProducers/data/10k_graph.pb"; 
+       tensorflow::GraphDef* graphDef = tensorflow::loadGraphDef(graph.c_str());
+       tensorflow::Session* session = tensorflow::createSession(graphDef);
+       tensorflow::Tensor input(tensorflow::DT_FLOAT, { nRH, 36 });
+
+       for(unsigned int it1 = 0; it1 < rhArr.size(); it1++){
+	   for(unsigned int it2 = 0; it2 < rhArr[it1].size(); it2++){
+              input.matrix<float>()(it1,it2) = rhArr[it1][it2];
+           }
+       }
+
+       //auto start = std::chrono::high_resolution_clock::now();
+       std::vector<tensorflow::Tensor> outputs;
+
+       std::cout << "Run inference..." << std::endl;
+       tensorflow::run(session, { { "input", input } }, { "output/BiasAdd" }, &outputs);
+       //auto elapsed = std::chrono::high_resolution_clock::now() - start;
+       //long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+       //std::cout << "RUN TIME: " << microseconds << std::endl;
+
+       std::cout << "Make new HBHERecHitCollection..." << std::endl;
+       int rh_it = 0;
+       for(HBHERecHitCollection::const_iterator itRH = rechits_tmp->begin(); itRH != rechits_tmp->end(); itRH++) {
+	  HBHERecHit rh = HBHERecHit(itRH->id(), outputs[0].matrix<float>()(rh_it,rh_it), itRH->time(), itRH->timeFalling());
+ 	  rh.setRawEnergy(itRH->eraw());
+ 	  rh.setAuxEnergy(itRH->eaux());
+	  rh.setChiSquared(itRH->chi2());
+	  rechits->push_back(rh); 
+          rh_it++;
+       }
+       std::cout << "New HBHERecHitCollection made..." << std::endl;
+    }
+
 }
 
 void HBHEPhase1Reconstructor::setCommonStatusBits(
@@ -721,10 +788,13 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
     }
 
     std::unique_ptr<HBHERecHitCollection> out;
+    std::unique_ptr<HBHERecHitCollection> out_tmp;
     if (makeRecHits_)
     {
         out = std::make_unique<HBHERecHitCollection>();
+        out_tmp = std::make_unique<HBHERecHitCollection>();
         out->reserve(maxOutputSize);
+        out_tmp->reserve(maxOutputSize);
     }
 
     // Process the input collections, filling the output ones
@@ -736,7 +806,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 
         HBHEChannelInfo channelInfo(false,false);
         processData<HBHEDataFrame>(*hbDigis, *conditions, *p, *mycomputer,
-                                   isData, &channelInfo, infos.get(), out.get(), use8ts_);
+                                   isData, &channelInfo, infos.get(), out.get(), out_tmp.get(), use8ts_);
         if (setNoiseFlagsQIE8_)
             hbheFlagSetterQIE8_->SetFlagsFromRecHits(*out);
     }
@@ -748,7 +818,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 
         HBHEChannelInfo channelInfo(true,saveEffectivePedestal_);
         processData<QIE11DataFrame>(*heDigis, *conditions, *p, *mycomputer,
-                                    isData, &channelInfo, infos.get(), out.get(), use8ts_);
+                                    isData, &channelInfo, infos.get(), out.get(), out_tmp.get(), use8ts_);
         if (setNoiseFlagsQIE11_)
             hbheFlagSetterQIE11_->SetFlagsFromRecHits(*out);
     }
@@ -832,6 +902,7 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
     desc.add<bool>("use8ts", false);
     desc.add<int>("sipmQTSShift", 0);
     desc.add<int>("sipmQNTStoSum", 3);
+    desc.add<bool>("runNN", true);
     desc.add<bool>("setNegativeFlagsQIE8");
     desc.add<bool>("setNegativeFlagsQIE11");
     desc.add<bool>("setNoiseFlagsQIE8");

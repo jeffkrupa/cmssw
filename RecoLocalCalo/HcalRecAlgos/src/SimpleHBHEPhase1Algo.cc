@@ -24,11 +24,9 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
     const float timeShift,
     const bool correctForPhaseContainment,
     const bool applyLegacyHBMCorrection,
-    const bool useNN,
     std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2,
     std::unique_ptr<HcalDeterministicFit> detFit,
-    std::unique_ptr<MahiFit> mahi,
-    std::unique_ptr<NNFit> NN)
+    std::unique_ptr<MahiFit> mahi)
     : pulseCorr_(PulseContainmentFractionalError),
       firstSampleShift_(firstSampleShift),
       samplesToAdd_(samplesToAdd),
@@ -39,18 +37,9 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
       applyLegacyHBMCorrection_(applyLegacyHBMCorrection),
       psFitOOTpuCorr_(std::move(m2)),
       hltOOTpuCorr_(std::move(detFit)),
-      mahiOOTpuCorr_(std::move(mahi)),
-      NNOOTpuCorr_(std::move(NN))
+      mahiOOTpuCorr_(std::move(mahi))
 
 {
-
-  if(useNN){
-    std::string cmssw_base_src = getenv("CMSSW_BASE");
-    std::string NNFile = "RecoLocalCalo/HcalRecProducers/data/graph_kin_ped_raw.pb";//"RecoLocalCalo/HcalRecProducers/data/graph.pb";
-    fNN = new NNInference();
-    fNN->initialize(NNFile);
-  }
-
   hcalTimeSlew_delay_ = nullptr;
 }
 
@@ -73,13 +62,11 @@ void SimpleHBHEPhase1Algo::endRun()
 HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
                                              const HcalRecoParam* params,
                                              const HcalCalibrations& calibs,
-                                             const bool isData)
+                                             const bool isData) 
 {
     HBHERecHit rh;
 
-    std::cout << "before channelId" << std::endl;
     const HcalDetId channelId(info.id());
-    std::cout << "after channelId" << std::endl;
 
     // Calculate "Method 0" quantities
     float m0t = 0.f, m0E = 0.f;
@@ -133,14 +120,6 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
       m4E *= hbminusCorrectionFactor(channelId, m4E, isData);
     }
 
-    // Run NN
-    float NNE = 0.f;
-    float NNT = 0.f;
-    const NNFit* NN = NNOOTpuCorr_.get();
-
-    if (NN)
-        NN->phase1Apply(info, NNE, &*fNN, channelId);
-
     // Finally, construct the rechit
     float rhE = m0E;
     float rht = m0t;
@@ -165,7 +144,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     float tdcTime = info.soiRiseTime();
     if (!HcalSpecialTimes::isSpecial(tdcTime))
         tdcTime += timeShift_;
-    rhE = NNE; 
+    
     rh = HBHERecHit(channelId, rhE, rht, tdcTime);
     rh.setRawEnergy(m0E);
     rh.setAuxEnergy(m3E);
