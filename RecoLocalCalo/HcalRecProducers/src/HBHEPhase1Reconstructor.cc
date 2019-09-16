@@ -21,6 +21,7 @@
 #include <cmath>
 #include <utility>
 #include <algorithm>
+#include <chrono>
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -37,6 +38,8 @@
 #include "DataFormats/HcalDigi/interface/HcalDigiCollections.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "DataFormats/METReco/interface/HcalPhase1FlagLabels.h"
+
+#include "DataFormats/CaloRecHit/interface/CaloRecHit.h"
 
 #include "CalibFormats/HcalObjects/interface/HcalDbService.h"
 #include "CalibFormats/HcalObjects/interface/HcalDbRecord.h"
@@ -59,7 +62,7 @@
 
 // Fetcher for reco algorithm data
 #include "RecoLocalCalo/HcalRecAlgos/interface/fetchHcalAlgoData.h"
-
+#include "PhysicsTools/TensorFlow/interface/TensorFlow.h"
 // Some helper functions
 namespace {
     // Class for making SiPM/QIE11 look like HPD/QIE8. HPD/QIE8
@@ -304,6 +307,7 @@ private:
     bool use8ts_;
     int sipmQTSShift_;
     int sipmQNTStoSum_;
+    bool runNN_;
 
     // Parameters for turning status bit setters on/off
     bool setNegativeFlagsQIE8_;
@@ -338,9 +342,11 @@ private:
                      HBHEChannelInfo* info,
                      HBHEChannelInfoCollection* infoColl,
                      HBHERecHitCollection* rechits,
+                     HBHERecHitCollection* rechits_tmp,
                      const bool use8ts);
 
     // Methods for setting rechit status bits
+
     void setAsicSpecificBits(const HBHEDataFrame& frame, const HcalCoder& coder,
                              const HBHEChannelInfo& info, const HcalCalibrations& calib,
                              HBHERecHit* rh);
@@ -370,6 +376,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       use8ts_(conf.getParameter<bool>("use8ts")),
       sipmQTSShift_(conf.getParameter<int>("sipmQTSShift")),
       sipmQNTStoSum_(conf.getParameter<int>("sipmQNTStoSum")),
+      runNN_(conf.getParameter<bool>("runNN")),
       setNegativeFlagsQIE8_(conf.getParameter<bool>("setNegativeFlagsQIE8")),
       setNegativeFlagsQIE11_(conf.getParameter<bool>("setNegativeFlagsQIE11")),
       setNoiseFlagsQIE8_(conf.getParameter<bool>("setNoiseFlagsQIE8")),
@@ -418,6 +425,19 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
 
     if (makeRecHits_)
         produces<HBHERecHitCollection>();
+
+    /*if(1){
+       std::string cmssw_base_src = getenv("CMSSW_BASE");
+       std::string graph_HB = cmssw_base_src + "/src/RecoLocalCalo/HcalRecProducers/data/10k_graph_HB.pb";
+       std::string graph_HE = cmssw_base_src + "/src/RecoLocalCalo/HcalRecProducers/data/10k_graph_HE.pb";
+
+       tensorflow::GraphDef* graphDef_HB = tensorflow::loadGraphDef(graph_HB.c_str());
+       tensorflow::GraphDef* graphDef_HE = tensorflow::loadGraphDef(graph_HE.c_str());
+
+       tensorflow::Session* session_HB = tensorflow::createSession(graphDef_HB);
+       tensorflow::Session* session_HE = tensorflow::createSession(graphDef_HE);
+
+    }*/
 }
 
 
@@ -425,6 +445,12 @@ HBHEPhase1Reconstructor::~HBHEPhase1Reconstructor()
 {
    // do anything here that needs to be done at destruction time
    // (e.g. close files, deallocate resources etc.)
+
+    /*if(1){
+       tensorflow::closeSession(session_HB);
+       tensorflow::closeSession(session_HE);
+       delete graphDef_HB; delete graphDef_HE;
+    }*/
 }
 
 
@@ -440,20 +466,30 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                           HBHEChannelInfo* channelInfo,
                                           HBHEChannelInfoCollection* infos,
                                           HBHERecHitCollection* rechits,
+                                          HBHERecHitCollection* rechits_tmp,
                                           const bool use8ts_)
 {
     // If "saveDroppedInfos_" flag is set, fill the info with something
     // meaningful even if the database tells us to drop this channel.
     // Note that this flag affects only "infos", the rechits are still
-    // not going to be constructed from such channels.
+    // not going to be constructed from such channel.
     const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
+
+    unsigned int nRH_HB = 0;
+    unsigned int nRH_HE = 0;
+    std::vector<std::vector<float>> rhArr_HB;
+    std::vector<std::vector<float>> rhArr_HE;
+    std::vector<float> NNvec; 
 
     // Iterate over the input collection
     for (typename Collection::const_iterator it = coll.begin();
          it != coll.end(); ++it)
     {
+
+      
         const DFrame& frame(*it);
         const HcalDetId cell(frame.id());
+
 
         // Protection against calibration channels which are not
         // in the database but can still come in the QIE11DataFrame
@@ -555,15 +591,124 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             const HcalRecoParam* pptr = nullptr;
             if (recoParamsFromDB_)
                 pptr = param_ts;
+ 
             HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
             if (rh.id().rawId())
             {
+ 		NNvec.clear(); 
+                if(runNN_)
+		  {
+                    float depth = (float)cell.depth();
+                    float ieta = (float)cell.ieta();
+                    float iphi = (float)cell.iphi();
+                    float gainCorr = (float)channelInfo->tsGain(1);
+		    //float lambda = (float)channelInfo->lambda();
+		    //float darkCurrent = (float)channelInfo->darkCurrent();
+                    float raw0 = (float)channelInfo->tsRawCharge(0);
+                    float raw1 = (float)channelInfo->tsRawCharge(1);
+                    float raw2 = (float)channelInfo->tsRawCharge(2);
+                    float raw3 = (float)channelInfo->tsRawCharge(3);
+                    float raw4 = (float)channelInfo->tsRawCharge(4);
+                    float raw5 = (float)channelInfo->tsRawCharge(5);
+                    float raw6 = (float)channelInfo->tsRawCharge(6);
+                    float raw7 = (float)channelInfo->tsRawCharge(7);
+                    NNvec.push_back(depth);
+                    NNvec.push_back(ieta);
+                    NNvec.push_back(iphi);
+                    NNvec.push_back(gainCorr);
+            	    NNvec.push_back(raw0);
+            	    NNvec.push_back(raw1);
+            	    NNvec.push_back(raw2);
+            	    NNvec.push_back(raw3);
+            	    NNvec.push_back(raw4);
+            	    NNvec.push_back(raw5);
+            	    NNvec.push_back(raw6);
+            	    NNvec.push_back(raw7);
+		    /*NNvec.push_back(0);
+
+                    if(abs(ieta) > 17.){
+                    if(depth == 1.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 2.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 3.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 4.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 5.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 6.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 7.) NNvec.push_back(1.); else NNvec.push_back(0.);
+	 	    }
+		    else if(abs(ieta) <= 17){
+
+                    if(depth == 1.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 2.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 3.) NNvec.push_back(1.); else NNvec.push_back(0.);
+                    if(depth == 4.) NNvec.push_back(1.); else NNvec.push_back(0.);
+		    }*/
+
+	         }
+
+		float ieta1 = (float)cell.ieta();
+		if     (std::abs(ieta1) > 17) { rhArr_HE.push_back(NNvec); nRH_HE++; }
+		else if(std::abs(ieta1) <= 17)  { rhArr_HB.push_back(NNvec); nRH_HB++; }
                 setAsicSpecificBits(frame, coder, *channelInfo, calib, &rh);
                 setCommonStatusBits(*channelInfo, calib, &rh);
-                rechits->push_back(rh);
+	        rechits->push_back(rh);
             }
         }
+
     }
+    if(1){
+       std::string cmssw_base_src = getenv("CMSSW_BASE");
+       std::string graph_HB = cmssw_base_src + "/src/RecoLocalCalo/HcalRecProducers/data/graph_HB.pb"; 
+       std::string graph_HE = cmssw_base_src + "/src/RecoLocalCalo/HcalRecProducers/data/graph_HE.pb"; 
+
+       std::cout << "start loading model" << std::endl;
+       tensorflow::GraphDef* graphDef_HB = tensorflow::loadGraphDef(graph_HB.c_str());
+       tensorflow::GraphDef* graphDef_HE = tensorflow::loadGraphDef(graph_HE.c_str());
+
+       tensorflow::Session* session_HB = tensorflow::createSession(graphDef_HB);
+       tensorflow::Session* session_HE = tensorflow::createSession(graphDef_HE);
+
+       std::cout << "model loaded, session created" << std::endl;
+       tensorflow::Tensor input_HB(tensorflow::DT_FLOAT, { nRH_HB, 12 });
+       tensorflow::Tensor input_HE(tensorflow::DT_FLOAT, { nRH_HE, 12 });
+
+       for(unsigned int it1 = 0; it1 < rhArr_HB.size(); it1++){
+	   for(unsigned int it2 = 0; it2 < rhArr_HB[it1].size(); it2++){
+              input_HB.matrix<float>()(it1,it2) = rhArr_HB[it1][it2];
+           }
+       }
+
+       for(unsigned int it1 = 0; it1 < rhArr_HE.size(); it1++){
+	   for(unsigned int it2 = 0; it2 < rhArr_HE[it1].size(); it2++){
+              input_HE.matrix<float>()(it1,it2) = rhArr_HE[it1][it2];
+           }
+       }
+       std::vector<tensorflow::Tensor> outputs_HE;
+       std::vector<tensorflow::Tensor> outputs_HB;
+
+       std::cout << "vectors/outputs prepared. Run session" << std::endl;
+       tensorflow::run(session_HB, { { "input", input_HB } }, { "output/BiasAdd" }, &outputs_HB);
+       tensorflow::run(session_HE, { { "input", input_HE } }, { "output/BiasAdd" }, &outputs_HE);
+       //auto elapsed = std::chrono::high_resolution_clock::now() - start;
+       //long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+       //std::cout << "RUN TIME: " << microseconds << std::endl;
+
+       int rh_HBit = 0;
+       int rh_HEit = 0;
+       // Replace mahi energy with NN inference result
+       //
+       std::cout << "place inference results back" << std::endl;
+       for(HBHERecHitCollection::iterator itRH = rechits->begin(); itRH != rechits->end(); itRH++) {
+
+          std::cout << itRH->energy() << "\t"; 
+	  if(std::abs(itRH->id().ieta()) > 17)  { itRH->setEnergy(outputs_HE[0].matrix<float>()(rh_HEit, rh_HEit)); rh_HEit++; }
+	  if(std::abs(itRH->id().ieta()) <= 17) { itRH->setEnergy(outputs_HB[0].matrix<float>()(rh_HBit, rh_HBit)); rh_HBit++; }
+          std::cout << itRH->energy() << std::endl;
+    
+       }
+
+       
+    }
+
 }
 
 void HBHEPhase1Reconstructor::setCommonStatusBits(
@@ -571,6 +716,7 @@ void HBHEPhase1Reconstructor::setCommonStatusBits(
     HBHERecHit* /* rh */)
 {
 }
+
 
 void HBHEPhase1Reconstructor::setAsicSpecificBits(
     const HBHEDataFrame& frame, const HcalCoder& coder,
@@ -668,10 +814,13 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
     }
 
     std::unique_ptr<HBHERecHitCollection> out;
+    std::unique_ptr<HBHERecHitCollection> out_tmp;
     if (makeRecHits_)
     {
         out = std::make_unique<HBHERecHitCollection>();
+        out_tmp = std::make_unique<HBHERecHitCollection>();
         out->reserve(maxOutputSize);
+        out_tmp->reserve(maxOutputSize);
     }
 
     // Process the input collections, filling the output ones
@@ -683,7 +832,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 
         HBHEChannelInfo channelInfo(false,false);
         processData<HBHEDataFrame>(*hbDigis, *conditions, *p, *mycomputer,
-                                   isData, &channelInfo, infos.get(), out.get(), use8ts_);
+                                   isData, &channelInfo, infos.get(), out.get(), out_tmp.get(), use8ts_);
         if (setNoiseFlagsQIE8_)
             hbheFlagSetterQIE8_->SetFlagsFromRecHits(*out);
     }
@@ -695,7 +844,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 
         HBHEChannelInfo channelInfo(true,saveEffectivePedestal_);
         processData<QIE11DataFrame>(*heDigis, *conditions, *p, *mycomputer,
-                                    isData, &channelInfo, infos.get(), out.get(), use8ts_);
+                                    isData, &channelInfo, infos.get(), out.get(), out_tmp.get(), use8ts_);
         if (setNoiseFlagsQIE11_)
             hbheFlagSetterQIE11_->SetFlagsFromRecHits(*out);
     }
@@ -759,6 +908,7 @@ HBHEPhase1Reconstructor::endRun(edm::Run const&, edm::EventSetup const&)
     desc.add<edm::ParameterSetDescription>(#name, name)
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
+
 void
 HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
 {
@@ -779,6 +929,7 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
     desc.add<bool>("use8ts", false);
     desc.add<int>("sipmQTSShift", 0);
     desc.add<int>("sipmQNTStoSum", 3);
+    desc.add<bool>("runNN", true);
     desc.add<bool>("setNegativeFlagsQIE8");
     desc.add<bool>("setNegativeFlagsQIE11");
     desc.add<bool>("setNoiseFlagsQIE8");
@@ -799,3 +950,4 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(HBHEPhase1Reconstructor);
+

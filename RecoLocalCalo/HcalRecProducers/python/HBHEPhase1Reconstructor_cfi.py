@@ -55,6 +55,8 @@ hbheprereco = cms.EDProducer(
     sipmQTSShift = cms.int32(0),
     sipmQNTStoSum = cms.int32(3),
 
+    runNN = cms.bool(True),
+
     # Configure the reconstruction algorithm
     algorithm = cms.PSet(
         # Parameters for "Method 3" (non-keyword arguments have to go first)
