@@ -595,7 +595,6 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
             if (rh.id().rawId())
             {
-                nRH++; 
  		NNvec.clear(); 
                 if(runNN_)
 		  {
@@ -683,83 +682,10 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
 	  if(std::abs(itRH->id().ieta()) > 17)  { itRH->setEnergy(outputs_HE[0].matrix<float>()(rh_HEit, rh_HEit)); rh_HEit++; }
 	  if(std::abs(itRH->id().ieta()) <= 17) { itRH->setEnergy(outputs_HB[0].matrix<float>()(rh_HBit, rh_HBit)); rh_HBit++; }
           std::cout << itRH->energy() << std::endl;
-    
+       }
        }
 
        
-    }
-=======
-            	    NNvec.push_back(ped0);
-            	    NNvec.push_back(ped1);
-            	    NNvec.push_back(ped2);
-            	    NNvec.push_back(ped3);
-            	    NNvec.push_back(ped4);
-            	    NNvec.push_back(ped5);
-            	    NNvec.push_back(ped6);
-            	    NNvec.push_back(ped7);
-            	    NNvec.push_back(raw1);
-            	    NNvec.push_back(raw2);
-            	    NNvec.push_back(raw3);
-            	    NNvec.push_back(raw4);
-            	    NNvec.push_back(raw5);
-            	    NNvec.push_back(raw6);
-            	    NNvec.push_back(raw7);
-            	    NNvec.push_back(ped0);
-            	    NNvec.push_back(ped1);
-            	    NNvec.push_back(ped2);
-            	    NNvec.push_back(ped3);
-            	    NNvec.push_back(ped4);
-            	    NNvec.push_back(ped5);
-            	    NNvec.push_back(ped6);
-            	    NNvec.push_back(ped7);
-	         }
-
-                rhArr.push_back(NNvec);
-                setAsicSpecificBits(frame, coder, *channelInfo, calib, &rh);
-                setCommonStatusBits(*channelInfo, calib, &rh);
-	  	std::cout << "Before RecHit" << std::endl;	
-	        rechits_tmp->push_back(rh);
-		std::cout << "After RecHit" << std::endl;
-            }
-        }
-
-    }
-    if(runNN_){
-       std::string cmssw_base_src = getenv("CMSSW_BASE");
-       std::string graph = cmssw_base_src + "/src/RecoLocalCalo/HcalRecProducers/data/10k_graph.pb"; 
-       tensorflow::GraphDef* graphDef = tensorflow::loadGraphDef(graph.c_str());
-       tensorflow::Session* session = tensorflow::createSession(graphDef);
-       tensorflow::Tensor input(tensorflow::DT_FLOAT, { nRH, 36 });
-
-       for(unsigned int it1 = 0; it1 < rhArr.size(); it1++){
-	   for(unsigned int it2 = 0; it2 < rhArr[it1].size(); it2++){
-              input.matrix<float>()(it1,it2) = rhArr[it1][it2];
-           }
-       }
-
-       //auto start = std::chrono::high_resolution_clock::now();
-       std::vector<tensorflow::Tensor> outputs;
-
-       std::cout << "Run inference..." << std::endl;
-       tensorflow::run(session, { { "input", input } }, { "output/BiasAdd" }, &outputs);
-       //auto elapsed = std::chrono::high_resolution_clock::now() - start;
-       //long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-       //std::cout << "RUN TIME: " << microseconds << std::endl;
-
-       std::cout << "Make new HBHERecHitCollection..." << std::endl;
-       int rh_it = 0;
-       for(HBHERecHitCollection::const_iterator itRH = rechits_tmp->begin(); itRH != rechits_tmp->end(); itRH++) {
-	  HBHERecHit rh = HBHERecHit(itRH->id(), outputs[0].matrix<float>()(rh_it,rh_it), itRH->time(), itRH->timeFalling());
- 	  rh.setRawEnergy(itRH->eraw());
- 	  rh.setAuxEnergy(itRH->eaux());
-	  rh.setChiSquared(itRH->chi2());
-	  rechits->push_back(rh); 
-          rh_it++;
-       }
-       std::cout << "New HBHERecHitCollection made..." << std::endl;
-    }
->>>>>>> 57dcdd67ce987078b200fb3889691efc63d3dd71
-
 }
 
 void HBHEPhase1Reconstructor::setCommonStatusBits(
