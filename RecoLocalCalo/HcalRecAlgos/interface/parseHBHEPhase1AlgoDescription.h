@@ -25,5 +25,4 @@ parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps);
 // "parseHBHEPhase1AlgoDescription".
 //
 edm::ParameterSetDescription fillDescriptionForParseHBHEPhase1Algo();
-
 #endif // RecoLocalCalo_HcalRecAlgos_parseHBHEPhase1AlgoDescription_h

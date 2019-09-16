@@ -38,6 +38,7 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
       psFitOOTpuCorr_(std::move(m2)),
       hltOOTpuCorr_(std::move(detFit)),
       mahiOOTpuCorr_(std::move(mahi))
+
 {
   hcalTimeSlew_delay_ = nullptr;
 }
@@ -61,7 +62,7 @@ void SimpleHBHEPhase1Algo::endRun()
 HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
                                              const HcalRecoParam* params,
                                              const HcalCalibrations& calibs,
-                                             const bool isData)
+                                             const bool isData) 
 {
     HBHERecHit rh;
 
@@ -143,6 +144,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     float tdcTime = info.soiRiseTime();
     if (!HcalSpecialTimes::isSpecial(tdcTime))
         tdcTime += timeShift_;
+    
     rh = HBHERecHit(channelId, rhE, rht, tdcTime);
     rh.setRawEnergy(m0E);
     rh.setAuxEnergy(m3E);

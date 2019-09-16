@@ -54,7 +54,6 @@ hbheprereco = cms.EDProducer(
     # (e.g., for cosmics), set sipmQTSShift to -100 and sipmQNTStoSum to 200.
     sipmQTSShift = cms.int32(0),
     sipmQNTStoSum = cms.int32(3),
-
     runNN = cms.bool(True),
 
     # Configure the reconstruction algorithm
@@ -77,8 +76,7 @@ hbheprereco = cms.EDProducer(
         useM3 = cms.bool(True),
 
         # Use Mahi?
-        useMahi = cms.bool(True),
-
+        useMahi = cms.bool(False),
         # Apply legacy HB- energy correction?
         applyLegacyHBMCorrection = cms.bool(True)
     ),

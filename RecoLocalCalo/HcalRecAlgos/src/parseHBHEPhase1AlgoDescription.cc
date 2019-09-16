@@ -95,6 +95,7 @@ parseHBHEMethod3Description(const edm::ParameterSet& conf)
 }
 
 
+
 std::unique_ptr<AbsHBHEPhase1Algo>
 parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
 {

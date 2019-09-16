@@ -1,6 +1,7 @@
 <flags   EDM_PLUGIN="1"/>
 <use   name="PhysicsTools/TensorFlow"/>
 <use   name="CalibCalorimetry/HcalAlgos"/>
+<use   name="PhysicsTools/TensorFlow"/>
 <use   name="CalibFormats/HcalObjects"/>
 <use   name="RecoLocalCalo/HcalRecAlgos"/>
 <use   name="FWCore/Framework"/>
