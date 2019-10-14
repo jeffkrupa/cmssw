@@ -17,7 +17,9 @@
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 #include "CommonTools/PileupAlgos/interface/PuppiContainer.h"
+#include "CommonTools/PileupAlgos/interface/BDTDepthCalc.hh"
 
+using namespace baconhep;
 // ------------------------------------------------------------------------------------------
 class PuppiProducer : public edm::stream::EDProducer<> {
 
@@ -38,13 +40,16 @@ public:
 private:
 	virtual void beginJob() ;
 	void produce(edm::Event&, const edm::EventSetup&) override;
-	virtual void endJob() ;
-      
+	double computeDepth(auto *aPF);
+	double computeDepthBDT(auto *aPF);
+        virtual void endJob() ;
+	void initBDT();
 	edm::EDGetTokenT< CandidateView > tokenPFCandidates_;
 	edm::EDGetTokenT< VertexCollection > tokenVertices_;
 	std::string     fPuppiName;
 	std::string     fPFName;	
 	std::string     fPVName;
+ 	std::string 	fdepthMVAName;
 	bool 			fPuppiDiagnostics;
 	bool 			fPuppiForLeptons;
 	bool            fUseDZ;
@@ -59,5 +64,8 @@ private:
 	std::vector<RecoObj> fRecoObjCollection;
         std::unique_ptr< PFOutputCollection >          fPuppiCandidates;
 	std::unique_ptr< PackedOutputCollection >      fPackedPuppiCandidates;
+
+        BDTDepthCalc    fBDTDepthCalc;
+        std::string 	lBDTFile;
 };
 #endif

@@ -12,7 +12,7 @@
 #include "FWCore/Utilities/interface/thread_safety_macros.h"
 #include <atomic>
 #include <mutex>
-
+#include <array>
 /* #include "DataFormats/Math/interface/PtEtaPhiMass.h" */
 
 // forward declare testing structure
@@ -39,7 +39,7 @@ public:
         packedDz_(0), packedDPhi_(0), packedDEta_(0), packedDTrkPt_(0),
         packedCovariance_(), packedPuppiweight_(0),
         packedPuppiweightNoLepDiff_(0), rawCaloFraction_(0),
-        rawHcalFraction_(0), caloFraction_(0), hcalFraction_(0), packedTime_(0),
+        rawHcalFraction_(0), caloFraction_(0), hcalFraction_(0), hcalDepthEnergyFractions_({{0,0,0,0,0,0,0}}), packedTime_(0),
         packedTimeError_(0), isIsolatedChargedHadron_(false),
         p4_(new PolarLorentzVector(0, 0, 0, 0)),
         p4c_(new LorentzVector(0, 0, 0, 0)), vertex_(new Point(0, 0, 0)),
@@ -53,7 +53,7 @@ public:
                            reco::VertexRef::key_type pvRefKey)
       : packedPuppiweight_(0), packedPuppiweightNoLepDiff_(0),
         rawCaloFraction_(0), rawHcalFraction_(0), caloFraction_(0),
-        hcalFraction_(0), packedTime_(0), packedTimeError_(0),
+        hcalFraction_(0), hcalDepthEnergyFractions_({{0,0,0,0,0,0,0}}), packedTime_(0), packedTimeError_(0),
         isIsolatedChargedHadron_(false),
         p4_(new PolarLorentzVector(c.pt(), c.eta(), c.phi(), c.mass())),
         p4c_(new LorentzVector(*p4_)), vertex_(new Point(c.vertex())), dphi_(0),
@@ -70,7 +70,7 @@ public:
                            reco::VertexRef::key_type pvRefKey)
       : packedPuppiweight_(0), packedPuppiweightNoLepDiff_(0),
         rawCaloFraction_(0), rawHcalFraction_(0), caloFraction_(0),
-        hcalFraction_(0), packedTime_(0), packedTimeError_(0),
+        hcalFraction_(0),hcalDepthEnergyFractions_({{0,0,0,0,0,0,0}}), packedTime_(0), packedTimeError_(0),
         isIsolatedChargedHadron_(false), p4_(new PolarLorentzVector(p4)),
         p4c_(new LorentzVector(*p4_)), vertex_(new Point(vtx)),
         dphi_(reco::deltaPhi(phiAtVtx, p4_.load()->phi())),
@@ -93,7 +93,7 @@ public:
                            reco::VertexRef::key_type pvRefKey)
       : packedPuppiweight_(0), packedPuppiweightNoLepDiff_(0),
         rawCaloFraction_(0), rawHcalFraction_(0), caloFraction_(0),
-        hcalFraction_(0), packedTime_(0), packedTimeError_(0),
+        hcalFraction_(0), hcalDepthEnergyFractions_({{0,0,0,0,0,0,0}}),packedTime_(0), packedTimeError_(0),
         isIsolatedChargedHadron_(false),
         p4_(new PolarLorentzVector(p4.Pt(), p4.Eta(), p4.Phi(), p4.M())),
         p4c_(new LorentzVector(p4)), vertex_(new Point(vtx)),
@@ -123,7 +123,8 @@ public:
         rawCaloFraction_(iOther.rawCaloFraction_),
         rawHcalFraction_(iOther.rawHcalFraction_),
         caloFraction_(iOther.caloFraction_),
-        hcalFraction_(iOther.hcalFraction_), packedTime_(iOther.packedTime_),
+        hcalFraction_(iOther.hcalFraction_), hcalDepthEnergyFractions_(iOther.hcalDepthEnergyFractions_),
+        packedTime_(iOther.packedTime_),
         packedTimeError_(iOther.packedTimeError_),
         isIsolatedChargedHadron_(iOther.isIsolatedChargedHadron_),
         // Need to trigger unpacking in iOther
@@ -154,7 +155,8 @@ public:
         rawCaloFraction_(iOther.rawCaloFraction_),
         rawHcalFraction_(iOther.rawHcalFraction_),
         caloFraction_(iOther.caloFraction_),
-        hcalFraction_(iOther.hcalFraction_), packedTime_(iOther.packedTime_),
+        hcalFraction_(iOther.hcalFraction_), hcalDepthEnergyFractions_(iOther.hcalDepthEnergyFractions_),
+        packedTime_(iOther.packedTime_),
         packedTimeError_(iOther.packedTimeError_),
         isIsolatedChargedHadron_(iOther.isIsolatedChargedHadron_),
         p4_(iOther.p4_.exchange(nullptr)), p4c_(iOther.p4c_.exchange(nullptr)),
@@ -190,6 +192,7 @@ public:
     rawHcalFraction_ = iOther.rawHcalFraction_;
     caloFraction_ = iOther.caloFraction_;
     hcalFraction_ = iOther.hcalFraction_;
+    hcalDepthEnergyFractions_ = iOther.hcalDepthEnergyFractions_;
     packedTime_ = iOther.packedTime_;
     packedTimeError_ = iOther.packedTimeError_;
     isIsolatedChargedHadron_ = iOther.isIsolatedChargedHadron_;
@@ -268,6 +271,7 @@ public:
     rawHcalFraction_ = iOther.rawHcalFraction_;
     caloFraction_ = iOther.caloFraction_;
     hcalFraction_ = iOther.hcalFraction_;
+    hcalDepthEnergyFractions_ = iOther.hcalDepthEnergyFractions_;
     packedTime_ = iOther.packedTime_;
     packedTimeError_ = iOther.packedTimeError_;
     isIsolatedChargedHadron_ = iOther.isIsolatedChargedHadron_;
@@ -881,7 +885,8 @@ public:
   float hcalFraction() const {
     return (hcalFraction_ / 100.);
   } /// Fraction of Hcal for HF, neutral hadrons, and charged particles
-
+    void setHcalDepthEnergyFractions(const std::array<float,7> & fracs);                      /// set fraction of Hcal energies in each depth
+    float hcalDepthEnergyFraction(unsigned int depth) const { return (hcalDepthEnergyFractions_[depth-1]/200.); }    /// Fraction of Hcal energies in each depth
   // isolated charged hadrons
   void setIsIsolatedChargedHadron(
       bool p); /// Set isolation (as in particle flow, i.e. at calorimeter
@@ -996,6 +1001,7 @@ protected:
   int8_t rawHcalFraction_;
   uint8_t caloFraction_;
   int8_t hcalFraction_;
+  std::array<uint8_t,7> hcalDepthEnergyFractions_;
   int16_t packedTime_;
   uint8_t packedTimeError_;
 

@@ -19,8 +19,13 @@
 //Main File
 #include "CommonTools/PileupAlgos/plugins/PuppiProducer.h"
 #include "CommonTools/PileupAlgos/interface/PuppiCandidate.h"
+#include "CommonTools/PileupAlgos/interface/BDTDepthCalc.hh"
+#include <iostream>
+#include "TMVA/PyMethodBase.h"
+#include "TMVA/Tools.h"
+#include <TMath.h>
 
-
+using namespace baconhep;
 // ------------------------------------------------------------------------------------------
 PuppiProducer::PuppiProducer(const edm::ParameterSet& iConfig) {
   fPuppiDiagnostics = iConfig.getParameter<bool>("puppiDiagnostics");
@@ -34,6 +39,12 @@ PuppiProducer::PuppiProducer(const edm::ParameterSet& iConfig) {
   fVtxNdofCut = iConfig.getParameter<int>("vtxNdofCut");
   fVtxZCut = iConfig.getParameter<double>("vtxZCut");
   fPuppiContainer = std::unique_ptr<PuppiContainer> ( new PuppiContainer(iConfig) );
+  fdepthMVAName = iConfig.getParameter<std::string>("depthMVAName");
+
+  std::string cmssw_base_src = getenv("CMSSW_BASE");
+  cmssw_base_src += "/src/";
+  lBDTFile = (cmssw_base_src + "CommonTools/PileupAlgos/data/" + fdepthMVAName.c_str());
+  initBDT();
 
   tokenPFCandidates_
     = consumes<CandidateView>(iConfig.getParameter<edm::InputTag>("candName"));
@@ -57,11 +68,18 @@ PuppiProducer::PuppiProducer(const edm::ParameterSet& iConfig) {
     produces<std::vector<double>> ("PuppiAlphasMed");
     produces<std::vector<double>> ("PuppiAlphasRms");
   }
+
+
+  
 }
 // ------------------------------------------------------------------------------------------
 PuppiProducer::~PuppiProducer(){
 }
 // ------------------------------------------------------------------------------------------
+void PuppiProducer::initBDT(){
+  fBDTDepthCalc.initialize("BDT",lBDTFile);
+}
+
 void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
 
   // Get PFCandidate Collection
@@ -80,18 +98,24 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
       if (!vtxIter->isFake() && vtxIter->ndof()>=fVtxNdofCut && std::abs(vtxIter->z())<=fVtxZCut)
          npv++;
    }
+  // This is a dummy to access the "translate" method which is a
+  // non-static member function even though it doesn't need to be. 
+  // Will fix in the future. 
+  static const reco::PFCandidate dummySinceTranslateIsNotStatic;
 
   //Fill the reco objects
+  std::vector<double> lDepths;
   fRecoObjCollection.clear();
   fRecoObjCollection.reserve(pfCol->size());
-  for(auto const& aPF : *pfCol) {
+  for(const auto & aPF : *pfCol) {
     RecoObj pReco;
     pReco.pt  = aPF.pt();
     pReco.eta = aPF.eta();
     pReco.phi = aPF.phi();
     pReco.m   = aPF.mass();
-    pReco.rapidity = aPF.rapidity();
-    pReco.charge = aPF.charge(); 
+    pReco.rapidity  = aPF.rapidity();
+    pReco.charge    = aPF.charge(); 
+    pReco.pfType    = dummySinceTranslateIsNotStatic.translatePdgIdToType(aPF.pdgId());
     const reco::Vertex *closestVtx = nullptr;
     double pDZ    = -9999; 
     double pD0    = -9999; 
@@ -101,6 +125,8 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
     if(lPack == nullptr ) {
 
       const reco::PFCandidate *pPF = dynamic_cast<const reco::PFCandidate*>(&aPF);
+      pReco.depth     = computeDepthBDT(pPF);
+      lDepths.push_back(pReco.depth);
       double curdz = 9999;
       int closestVtxForUnassociateds = -9999;
       const reco::TrackRef aTrackRef = pPF->trackRef();
@@ -160,7 +186,18 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
       pD0        = lPack->dxy();
       pReco.dZ      = pDZ;
       pReco.d0      = pD0;
-  
+      pReco.depth     = computeDepthBDT(lPack);
+      lDepths.push_back(pReco.depth);
+
+      pReco.chi2Depth = pReco.depth;
+
+      float pupTemp = lPack->puppiWeight();
+      if (pupTemp >= 0.99999) pupTemp = 1-1e-16;
+      if (pupTemp <= 0.00001) pupTemp = 1e-16;
+      //pReco.chi2Puppi = TMath::ChisquareQuantile(pupTemp,1);
+      //lPack->setDepthChi2(pReco.depth);
+      //lPack->setPuppiChi2(TMath::ChisquareQuantile(lPack->puppiWeight(),1));
+
       pReco.id = 0; 
       if (std::abs(pReco.charge) == 0){ pReco.id = 0; }
       if (std::abs(pReco.charge) > 0){
@@ -184,8 +221,10 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
   fPuppiContainer->setNPV( npv );
 
   std::vector<double> lWeights;
+
   std::vector<PuppiCandidate> lCandidates;
   if (!fUseExistingWeights){
+
     //Compute the weights and get the particles
     lWeights = fPuppiContainer->puppiWeights();
     lCandidates = fPuppiContainer->puppiParticles();
@@ -217,11 +256,6 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
   edm::ValueMap<float>::Filler  lPupFiller(*lPupOut);
   lPupFiller.insert(hPFProduct,lWeights.begin(),lWeights.end());
   lPupFiller.fill();
-
-  // This is a dummy to access the "translate" method which is a
-  // non-static member function even though it doesn't need to be. 
-  // Will fix in the future. 
-  static const reco::PFCandidate dummySinceTranslateIsNotStatic;
 
   // Fill a new PF/Packed Candidate Collection and write out the ValueMap of the new p4s.
   // Since the size of the ValueMap must be equal to the input collection, we need
@@ -284,7 +318,7 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
   edm::ValueMap<LorentzVector>::Filler  p4PupFiller(*p4PupOut);
   p4PupFiller.insert(hPFProduct,puppiP4s.begin(), puppiP4s.end() );
   p4PupFiller.fill();
-  
+ 
   iEvent.put(std::move(lPupOut));
   iEvent.put(std::move(p4PupOut));
   if (fUseExistingWeights || fClonePackedCands) {
@@ -324,7 +358,16 @@ void PuppiProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
     iEvent.put(std::move(theAlphasMed),"PuppiAlphasMed");
     iEvent.put(std::move(theAlphasRms),"PuppiAlphasRms");
   }
-  
+}
+// ------------------------------------------------------------------------------------------
+double PuppiProducer::computeDepthBDT(auto *aPF) {
+  float lDepth[7];
+
+  //Get inference from trained MVA file
+  for(unsigned int i0 = 0; i0 < 7; i0++) lDepth[i0] = aPF->hcalDepthEnergyFraction(i0+1);
+  double d = fBDTDepthCalc.mvaValue(aPF->eta(), aPF->phi(), lDepth[0],lDepth[1],lDepth[2],lDepth[3], lDepth[4],lDepth[5],lDepth[6]);
+
+  return d; 
 }
 
 // ------------------------------------------------------------------------------------------
