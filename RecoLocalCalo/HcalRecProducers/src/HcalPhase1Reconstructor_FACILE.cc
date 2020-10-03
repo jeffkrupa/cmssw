@@ -42,44 +42,40 @@ public:
 	channelInfo = hChannelInfo.product();
 
 	//iInput = Input(1000, 0.f);
-	auto& input1 = iInput.begin()->second;
+	auto& input1 = iInput.end()->second;
 	auto data1 = std::make_shared<TritonInput<float>>();
 	data1->reserve(input1.batchSize());
 	
-        unsigned int iBatch = 0;
 	for(HBHEChannelInfoCollection::const_iterator itC = channelInfo->begin(); itC != channelInfo->end(); itC++){
 
-	    //keeptrack of batching for inputs
-	    iBatch = std::distance(channelInfo->begin(),itC);
-
+	    std::vector<float> input;
 	    const HBHEChannelInfo& pChannel(*itC);
   	    const HcalDetId        pDetId = pChannel.id();
  	    hcalIds.push_back(pDetId);    
 
 	    //FACILE uses iphi as a continuous variable
-	    //iInput[iBatch*nInputs_ + 0] = (float)pDetId.iphi();
-	    //iInput[iBatch*nInputs_ + 1] = (float)pChannel.tsGain(0);
-	    data1->emplace_back(iBatch, (float)pDetId.iphi());
-	    
+	    input.push_back((float)pDetId.iphi());
 	    for (unsigned int itTS=0; itTS < pChannel.nSamples(); ++itTS) {
-		//iInput[iBatch*nInputs_ + itTS + 2] = (float)pChannel.tsRawCharge(itTS);
-		data1->emplace_back(iBatch, (float)pChannel.tsRawCharge(itTS));
+		input.push_back((float)pChannel.tsRawCharge(itTS));
 	    }
   
 	    //FACILE considers 7 Hcal depths as binary variables
             for (int itDepth=1; itDepth < 8; itDepth++){
-		if (pDetId.depth() == itDepth)  data1->emplace_back(iBatch, 1.);//iInput[iBatch*nInputs_ + itDepth + 9] = 1.;
-		else				data1->emplace_back(iBatch, 0.);//iInput[iBatch*nInputs_ + itDepth + 9] = 0.;
+		if (pDetId.depth() == itDepth)  input.push_back(1.);
+		else				input.push_back(0.);
 	    }
 
 	    //ieta is also encoded as a binary variable
 	    for (int itIeta = 0; itIeta < 30; itIeta++){
-		if (std::abs(pDetId.ieta()) == itIeta)  data1->emplace_back(iBatch, 1.);//iInput[iBatch*nInputs_ + itIeta + 17] = 1.;
-		else					data1->emplace_back(iBatch, 0.);//iInput[iBatch*nInputs_ + itIeta + 17] = 0.;
+		if (std::abs(pDetId.ieta()) == itIeta)  input.push_back(1.);
+		else					input.push_back(0.);
 	    }
+
+	    data1->push_back(input);
 	}
 
 	input1.toServer(data1);
+	std::cout << "inputs made" << std::endl;
     }
 
     void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
