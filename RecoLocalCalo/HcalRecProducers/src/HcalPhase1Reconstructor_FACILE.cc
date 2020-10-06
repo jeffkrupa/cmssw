@@ -41,10 +41,9 @@ public:
 	iEvent.getByToken(fTokChannelInfo, hChannelInfo); 
 	channelInfo = hChannelInfo.product();
 
-	//iInput = Input(1000, 0.f);
-	auto& input1 = iInput.end()->second;
+	auto& input1 = iInput.begin()->second;
 	auto data1 = std::make_shared<TritonInput<float>>();
-	data1->reserve(input1.batchSize());
+	data1->reserve(std::distance(channelInfo->begin(), channelInfo->end()));
 	
 	for(HBHEChannelInfoCollection::const_iterator itC = channelInfo->begin(); itC != channelInfo->end(); itC++){
 
@@ -55,27 +54,37 @@ public:
 
 	    //FACILE uses iphi as a continuous variable
 	    input.push_back((float)pDetId.iphi());
+            input.push_back((float)pChannel.tsGain(0.));
 	    for (unsigned int itTS=0; itTS < pChannel.nSamples(); ++itTS) {
 		input.push_back((float)pChannel.tsRawCharge(itTS));
 	    }
   
 	    //FACILE considers 7 Hcal depths as binary variables
             for (int itDepth=1; itDepth < 8; itDepth++){
-		if (pDetId.depth() == itDepth)  input.push_back(1.);
-		else				input.push_back(0.);
+		if (pDetId.depth() == itDepth)  input.push_back(1.f);
+		else				input.push_back(0.f);
 	    }
 
 	    //ieta is also encoded as a binary variable
-	    for (int itIeta = 0; itIeta < 30; itIeta++){
-		if (std::abs(pDetId.ieta()) == itIeta)  input.push_back(1.);
-		else					input.push_back(0.);
+	    for (int itIeta = 1; itIeta < 30; itIeta++){
+		if (std::abs(pDetId.ieta()) == itIeta)  input.push_back(1.f);
+		else					input.push_back(0.f);
 	    }
 
 	    data1->push_back(input);
 	}
 
+
+	//set batch at maximum RH size after ZS and pad	
+        unsigned int last = std::distance(channelInfo->begin(), channelInfo->end());
+        if(last < input1.batchSize()){
+	    std::vector<float> pV(47,0.f);
+ 	    for(unsigned int iP = last; iP != input1.batchSize(); iP++){
+                data1->push_back(pV);
+	    }
+        } 
+
 	input1.toServer(data1);
-	std::cout << "inputs made" << std::endl;
     }
 
     void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
@@ -83,25 +92,23 @@ public:
 	out = std::make_unique<HBHERecHitCollection>();
 	out->reserve(hcalIds.size());
 
-	unsigned int iBatch = 0;
 	const auto& output1 = iOutput.begin()->second;
-	const auto& tmp = output1.fromServer<float>();
+	const auto& outputs = output1.fromServer<float>();
 
-	for(HBHERecHitCollection::const_iterator itRH = out->begin(); itRH != out->end(); itRH++){
+	for(std::size_t iB = 0; iB < hcalIds.size(); iB++){
 
-	    //float rhE = iOutput[iBatch];
-	    float rhE = tmp[0][iBatch];
-	    //FACILE uses rectified linear activation function =>should be positive definite
+	    float rhE = outputs[iB][0];
+	    std::cout << rhE << "/" << outputs[iB][1] << std::endl;
 	    if(rhE < 0.) rhE = 0.;
-	    //throw cms exception?
+	    //exception?
 	    if(std::isnan(rhE)) rhE = 0; 
 	    if(std::isinf(rhE)) rhE = 0; 
 
 	    //FACILE does no time reco 
-	    HBHERecHit rh = HBHERecHit(hcalIds[iBatch],rhE,0.f,0.f);
+	    HBHERecHit rh = HBHERecHit(hcalIds[iB],rhE,0.f,0.f);
 	    out->push_back(rh); //hcalIds[iBatch],rhE,0.f,0.f);
 
-	    iBatch++;
+	    //iBatch++;
 	}
 	iEvent.put(std::move(out));	
     }
