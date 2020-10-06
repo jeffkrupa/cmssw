@@ -18,14 +18,12 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "DataFormats/HcalRecHit/interface/HBHERecHit.h"
 
-//#include "RecoLocalCalo/HcalRecProducers/src/HcalPhase1Reconstructor_FACILE2.h"
+//#include "RecoLocalCalo/HcalRecProducers/src/HcalPhase1Reconstructor_FACILE.h"
 class HcalPhase1Reconstructor_FACILE : public SonicEDProducer<TritonClient>
 {
 public:
     explicit HcalPhase1Reconstructor_FACILE(edm::ParameterSet const& cfg) : 
         SonicEDProducer<TritonClient>(cfg),
-        //nInputs_(cfg.getParameter<int>("nInputs")),
-        //batchSize_(cfg.getParameter<int>("batchSize")),
         fChannelInfoName(cfg.getParameter<edm::InputTag>("ChannelInfoName")),
         fTokChannelInfo(this->template consumes<HBHEChannelInfoCollection>(fChannelInfoName))
      
@@ -100,17 +98,14 @@ public:
 	for(std::size_t iB = 0; iB < hcalIds.size(); iB++){
 
 	    float rhE = outputs[iB][0];
-	    std::cout << rhE << "/" << outputs[iB][1] << std::endl;
-	    if(rhE < 0.) rhE = 0.;
+	    if(rhE < 0.) rhE = 0.;//shouldn't be necessary, relu activation function
 	    //exception?
 	    if(std::isnan(rhE)) rhE = 0; 
 	    if(std::isinf(rhE)) rhE = 0; 
 
 	    //FACILE does no time reco 
 	    HBHERecHit rh = HBHERecHit(hcalIds[iB],rhE,0.f,0.f);
-	    out->push_back(rh); //hcalIds[iBatch],rhE,0.f,0.f);
-
-	    //iBatch++;
+	    out->push_back(rh); 
 	}
 	iEvent.put(std::move(out));	
     }
@@ -125,7 +120,6 @@ public:
 
 
 private:
-    //int nInputs_, batchSize_;
     edm::InputTag fChannelInfoName;   
     edm::EDGetTokenT<HBHEChannelInfoCollection> fTokChannelInfo;
     std::vector<HcalDetId> hcalIds;
