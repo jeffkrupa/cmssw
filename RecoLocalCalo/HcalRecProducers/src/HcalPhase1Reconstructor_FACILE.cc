@@ -44,6 +44,8 @@ public:
 	auto& input1 = iInput.begin()->second;
 	auto data1 = std::make_shared<TritonInput<float>>();
 	data1->reserve(std::distance(channelInfo->begin(), channelInfo->end()));
+
+	hcalIds.clear(); 
 	
 	for(HBHEChannelInfoCollection::const_iterator itC = channelInfo->begin(); itC != channelInfo->end(); itC++){
 
@@ -66,7 +68,7 @@ public:
 	    }
 
 	    //ieta is also encoded as a binary variable
-	    for (int itIeta = 1; itIeta < 30; itIeta++){
+	    for (int itIeta = 0; itIeta < 30; itIeta++){
 		if (std::abs(pDetId.ieta()) == itIeta)  input.push_back(1.f);
 		else					input.push_back(0.f);
 	    }
@@ -78,9 +80,9 @@ public:
 	//set batch at maximum RH size after ZS and pad	
         unsigned int last = std::distance(channelInfo->begin(), channelInfo->end());
         if(last < input1.batchSize()){
-	    std::vector<float> pV(47,0.f);
+	    std::vector<float> pad(47,0.f);
  	    for(unsigned int iP = last; iP != input1.batchSize(); iP++){
-                data1->push_back(pV);
+                data1->push_back(pad);
 	    }
         } 
 
