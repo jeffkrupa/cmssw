@@ -25,7 +25,7 @@ public:
     explicit HcalReconstructor(edm::ParameterSet const& cfg) : 
         SonicEDProducer<TritonClient>(cfg),
         fChannelInfoName_(cfg.getParameter<edm::InputTag>("ChannelInfoName")),
-        fTokChannelInfo(this->consumes<HBHEChannelInfoCollection>(fChannelInfoName_))
+        fTokChannelInfo_(this->consumes<HBHEChannelInfoCollection>(fChannelInfoName_))
      
     {
         this->produces<HBHERecHitCollection>();
@@ -75,7 +75,8 @@ public:
 	}
 
 	//set batch at maximum RHcollsize; pad the remainder
-        if(std::distance(channelInfo->begin(), channelInfo->end()) < input1.batchSize()){
+        unsigned last = std::distance(channelInfo->begin(), channelInfo->end());
+        if(last < input1.batchSize()){
 	    std::vector<float> pad(47,0.f);
  	    for(unsigned int iP = last; iP != input1.batchSize(); iP++){
                 data1->push_back(pad);
