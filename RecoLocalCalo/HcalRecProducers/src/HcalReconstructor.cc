@@ -2,7 +2,6 @@
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Utilities/interface/InputTag.h"
 #include "DataFormats/Common/interface/Handle.h"
-//#include "Geometry/HcalCommonData/interface/HcalHitRelabeller.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "HeterogeneousCore/SonicTriton/interface/TritonClient.h"
 #include "HeterogeneousCore/SonicCore/interface/SonicEDProducer.h"
@@ -11,7 +10,6 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "DataFormats/HcalRecHit/interface/HBHERecHit.h"
 
-//#include "RecoLocalCalo/HcalRecProducers/src/HcalPhase1Reconstructor_FACILE.h"
 class HcalReconstructor : public SonicEDProducer<TritonClient>
 {
 public:
