@@ -5,9 +5,10 @@ sys.path = sys.path + [os.path.expandvars("$CMSSW_BASE/src/HLTrigger/Configurati
 
 from OnLine_HLT_GRun import process
 
-process.hltHbherecopre = process.hltHbhereco.clone()
-process.hltHbherecopre.__setattr__('makeRecHits',False)
-process.hltHbherecopre.__setattr__('saveInfos',True)
+process.hltHbherecopre = process.hltHbhereco.clone(
+    makeRecHits = cms.bool(False),
+    saveInfos = cms.bool(True),
+)
 
 process.hltHbhereco = cms.EDProducer("HcalReconstructor",
     Client = cms.PSet(
