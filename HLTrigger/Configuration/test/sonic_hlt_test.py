@@ -18,8 +18,8 @@ process.hltHbhereco = cms.EDProducer("HcalReconstructor",
         timeout = cms.untracked.uint32(300),
         modelName = cms.string("facile_all_v2"),
         mode = cms.string("Async"),
-        modelVersion = cms.int32(-1),#string("Async"),
-        verbose = cms.untracked.bool(True),
+        modelVersion = cms.int32(-1),
+        verbose = cms.untracked.bool(False),
         allowedTries = cms.untracked.uint32(5),
         outputs = cms.untracked.vstring("output/BiasAdd"),
     ),
@@ -30,9 +30,3 @@ process.HLTDoLocalHcalSequence = cms.Sequence( process.hltHcalDigis + process.hl
 process.HLTStoppedHSCPLocalHcalReco = cms.Sequence( process.hltHcalDigis + process.hltHbherecopre + process.hltHbhereco)
 
 process.source.fileNames = cms.untracked.vstring("file:RelVal_Raw_GRun_MC.root")
-
-process.options.numberOfThreads = cms.untracked.uint32(1)
-process.options.numberOfStreams = cms.untracked.uint32(0)
-
-from HLTrigger.Configuration.customizeHLTforCMSSW import customizeHLTforCMSSW
-process = customizeHLTforCMSSW(process,"GRun")
