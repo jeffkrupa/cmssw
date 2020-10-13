@@ -9,37 +9,42 @@
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "DataFormats/HcalRecHit/interface/HBHERecHit.h"
+#include "Geometry/CaloTopology/interface/HcalTopology.h"
+#include "Geometry/Records/interface/HcalRecNumberingRecord.h"
 
-class HcalReconstructor : public SonicEDProducer<TritonClient>
+class FacileHcalReconstructor : public SonicEDProducer<TritonClient>
 {
 public:
-    explicit HcalReconstructor(edm::ParameterSet const& cfg) : 
+    explicit FacileHcalReconstructor(edm::ParameterSet const& cfg) : 
         SonicEDProducer<TritonClient>(cfg),
         fChannelInfoName_(cfg.getParameter<edm::InputTag>("ChannelInfoName")),
-        fTokChannelInfo_(this->consumes<HBHEChannelInfoCollection>(fChannelInfoName_))
+        fTokChannelInfo_(consumes<HBHEChannelInfoCollection>(fChannelInfoName_))
      
     {
-        this->produces<HBHERecHitCollection>();
-        this->setDebugName("HcalReconstructor");
+        produces<HBHERecHitCollection>();
+        setDebugName("FacileHcalReconstructor");
     }
 
     void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
 
-	const HBHEChannelInfoCollection *channelInfo   = 0;
 	edm::Handle<HBHEChannelInfoCollection> hChannelInfo;
 	iEvent.getByToken(fTokChannelInfo_, hChannelInfo); 
-	channelInfo = hChannelInfo.product();
+	const HBHEChannelInfoCollection *channelInfo = hChannelInfo.product();
+
+        edm::ESHandle<HcalTopology> hcalTopology;
+        iSetup.get<HcalRecNumberingRecord>().get(hcalTopology);
+	const HcalTopology* theHcalTopology = hcalTopology.product();
 
 	auto& input1 = iInput.begin()->second;
 	auto data1 = std::make_shared<TritonInput<float>>();
-	data1->reserve(std::distance(channelInfo->begin(), channelInfo->end()));
+	data1->reserve(channelInfo->size());
+        client_.setBatchSize(channelInfo->size());
 
 	hcalIds_.clear(); 
-	
-	for(HBHEChannelInfoCollection::const_iterator itC = channelInfo->begin(); itC != channelInfo->end(); itC++){
+
+	for(const auto& pChannel : *channelInfo){	
 
 	    std::vector<float> input;
-	    const HBHEChannelInfo& pChannel(*itC);
   	    const HcalDetId        pDetId = pChannel.id();
  	    hcalIds_.push_back(pDetId);    
 
@@ -51,28 +56,19 @@ public:
 	    }
   
 	    //FACILE considers 7 Hcal depths as binary variables
-            for (int itDepth=1; itDepth < 8; itDepth++){
+            for (int itDepth=1; itDepth < theHcalTopology->maxDepth(); itDepth++){
 		if (pDetId.depth() == itDepth)  input.push_back(1.f);
 		else				input.push_back(0.f);
 	    }
 
 	    //ieta is also encoded as a binary variable
-	    for (int itIeta = 0; itIeta < 30; itIeta++){
+	    for (int itIeta = 0; itIeta < theHcalTopology->lastHERing(); itIeta++){
 		if (std::abs(pDetId.ieta()) == itIeta)  input.push_back(1.f);
 		else					input.push_back(0.f);
 	    }
 
 	    data1->push_back(input);
 	}
-
-	//set batch at maximum RHcollsize; pad the remainder
-        unsigned last = std::distance(channelInfo->begin(), channelInfo->end());
-        if(last < input1.batchSize()){
-	    std::vector<float> pad(47,0.f);
- 	    for(unsigned int iP = last; iP != input1.batchSize(); iP++){
-                data1->push_back(pad);
-	    }
-        } 
 
 	input1.toServer(data1);
     }
@@ -88,10 +84,7 @@ public:
 	for(std::size_t iB = 0; iB < hcalIds_.size(); iB++){
 
 	    float rhE = outputs[iB][0];
-	    if(rhE < 0.) rhE = 0.;//shouldn't be necessary, relu activation function
-	    //exception?
-	    if(std::isnan(rhE)) rhE = 0; 
-	    if(std::isinf(rhE)) rhE = 0; 
+	    if(rhE < 0. or std::isnan(rhE) or std::isinf(rhE)) rhE = 0; 
 
 	    //FACILE does no time reco 
 	    HBHERecHit rh = HBHERecHit(hcalIds_[iB],rhE,0.f,0.f);
@@ -100,13 +93,12 @@ public:
 	iEvent.put(std::move(out));	
     }
 
-    /*static void fillDescriptions(edm::ConfigurationDescriptions & descriptions) {
+    static void fillDescriptions(edm::ConfigurationDescriptions & descriptions) {
         edm::ParameterSetDescription desc;
         TritonClient::fillPSetDescription(desc);
-        //add producer-specific parameters
- 	desc.add<edm::InputTag>("ChannelInfoName","hbheprereco");
-        descriptions.add("HcalPhase1Reconstructor_FACILE",desc);
-    }*/
+ 	desc.add<edm::InputTag>("ChannelInfoName");
+        descriptions.add("FacileHcalReconstructor",desc);
+    }
 
 
 private:
@@ -115,4 +107,4 @@ private:
     std::vector<HcalDetId> hcalIds_;
 };
 
-DEFINE_FWK_MODULE(HcalReconstructor);
+DEFINE_FWK_MODULE(FacileHcalReconstructor);

@@ -10,10 +10,10 @@ process.hltHbherecopre = process.hltHbhereco.clone(
     saveInfos = cms.bool(True),
 )
 
-process.hltHbhereco = cms.EDProducer("HcalReconstructor",
+process.hltHbhereco = cms.EDProducer("FacileHcalReconstructor",
     Client = cms.PSet(
         batchSize = cms.untracked.uint32(16000),
-        address = cms.untracked.string("ailab01.fnal.gov"),
+        address = cms.untracked.string("0.0.0.0"),
         port = cms.untracked.uint32(8001),
         timeout = cms.untracked.uint32(300),
         modelName = cms.string("facile_all_v2"),
