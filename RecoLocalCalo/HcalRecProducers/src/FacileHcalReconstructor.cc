@@ -50,12 +50,10 @@ public:
       }
 
       //FACILE considers 7 Hcal depths as binary variables
-      std::cout << htopo->maxDepth() << std::endl;
-      for (int itDepth = 1; itDepth < htopo->maxDepth(); itDepth++) {
+      for (int itDepth = 1; itDepth <= htopo->maxDepth(); itDepth++) {
         input.push_back(pDetId.depth() == itDepth);
       }
 
-      std::cout << htopo->lastHERing() << std::endl;
       //ieta is also encoded as a binary variable
       for (int itIeta = 0; itIeta <= htopo->lastHERing(); itIeta++) {
         input.push_back(pDetId.ieta() == itIeta);
