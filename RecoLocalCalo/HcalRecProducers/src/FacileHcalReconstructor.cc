@@ -26,18 +26,17 @@ public:
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     edm::Handle<HBHEChannelInfoCollection> hChannelInfo;
     iEvent.getByToken(fTokChannelInfo_, hChannelInfo);
-    const HBHEChannelInfoCollection* channelInfo = hChannelInfo.product();
 
     const HcalTopology* htopo = &iSetup.getData(htopoToken_);
 
     auto& input1 = iInput.begin()->second;
     auto data1 = std::make_shared<TritonInput<float>>();
-    data1->reserve(channelInfo->size());
-    client_.setBatchSize(channelInfo->size());
+    data1->reserve(hChannelInfo->size());
+    client_.setBatchSize(hChannelInfo->size());
 
     hcalIds_.clear();
 
-    for (const auto& pChannel : *channelInfo) {
+    for (const auto& pChannel : *hChannelInfo) {
       std::vector<float> input;
       const HcalDetId pDetId = pChannel.id();
       hcalIds_.push_back(pDetId);
