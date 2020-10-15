@@ -41,21 +41,19 @@ public:
       const HcalDetId pDetId = pChannel.id();
       hcalIds_.push_back(pDetId);
 
-      //FACILE uses iphi as a continuous variable
-      input.push_back((float)pDetId.iphi());
-      input.push_back((float)pChannel.tsGain(0.));
+      //inputs for Facile: iphi, gain, raw[8], depth (categorical), ieta (categorical)
+      input.push_back(pDetId.iphi());
+      input.push_back(pChannel.tsGain(0.));
       for (unsigned int itTS = 0; itTS < pChannel.nSamples(); ++itTS) {
-        input.push_back((float)pChannel.tsRawCharge(itTS));
+        input.push_back(pChannel.tsRawCharge(itTS));
       }
 
-      //FACILE considers 7 Hcal depths as binary variables
       for (int itDepth = 1; itDepth <= htopo->maxDepth(); itDepth++) {
         input.push_back(pDetId.depth() == itDepth);
       }
 
-      //ieta is also encoded as a binary variable
       for (int itIeta = 0; itIeta <= htopo->lastHERing(); itIeta++) {
-        input.push_back(pDetId.ieta() == itIeta);
+        input.push_back(pDetId.ietaAbs() == itIeta);
       }
 
       data1->push_back(input);
@@ -77,7 +75,6 @@ public:
       if (rhE < 0. or std::isnan(rhE) or std::isinf(rhE))
         rhE = 0;
 
-      //FACILE does no time reco
       HBHERecHit rh = HBHERecHit(hcalIds_[iB], rhE, 0.f, 0.f);
       out->push_back(rh);
     }
